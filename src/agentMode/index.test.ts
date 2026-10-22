@@ -218,6 +218,31 @@ describe("agentMode", () => {
       await mockManager.registerPreload.mock.calls.find(([id]) => id === "opencode")![1];
       expect(mockManager.preloadModels).toHaveBeenCalledWith("opencode");
     });
+    it("links built-in skills for an agent whose installation check turns ready after the startup pass, before it preloads (https://github.com/spectre009/obsidian-copilot/issues/2)", async () => {
+      mockStates.opencode = { kind: "checking", source: "managed" };
+      mockDescriptors[1].onPluginLoad.mockImplementationOnce(async () => {
+        mockStates.opencode = { kind: "ready", source: "managed" };
+      });
+      let reconcilePassesAtPreload = -1;
+      mockManager.preloadModels.mockImplementation(async () => {
+        reconcilePassesAtPreload = reconcile.mock.calls.length;
+      });
+      createAgentSessionManager({} as App, plugin);
+      expect(reconcile).toHaveBeenCalledWith(
+        expect.objectContaining({ availableAgents: ["claude"] })
+      );
+      await mockManager.registerPreload.mock.calls.find(([id]) => id === "opencode")![1];
+      expect(reconcile).toHaveBeenLastCalledWith(
+        expect.objectContaining({ availableAgents: ["claude", "opencode"] })
+      );
+      expect(reconcilePassesAtPreload).toBe(reconcile.mock.calls.length);
+      mockManager.preloadModels.mockImplementation(async () => {});
+    });
+    it("gives an agent the startup pass already included no extra skill pass (https://github.com/spectre009/obsidian-copilot/issues/2)", async () => {
+      createAgentSessionManager({} as App, plugin);
+      await Promise.all(mockManager.registerPreload.mock.calls.map(([, ready]) => ready));
+      expect(reconcile).toHaveBeenCalledTimes(1);
+    });
     it(`waits for initial skill reconciliation before preloading ready agents ${ISSUE}`, async () => {
       const gate = deferred();
       reconcile.mockReturnValue(gate.promise);

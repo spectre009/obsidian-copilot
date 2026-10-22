@@ -160,6 +160,12 @@ describe("agentSystemPrompt", () => {
       );
     });
 
+    it("names the GitHub Copilot CLI's own edit tools, so its writes show a diff (https://github.com/spectre009/obsidian-copilot/issues/2)", () => {
+      expect(buildAgentSystemPrompt("github-copilot")).toContain(
+        "Edit vault files with your edit/create/apply_patch tools so Copilot shows a diff"
+      );
+    });
+
     it("limits shell file writes, not other shell use, to moves, script rewrites of most of a large file, and bulk changes across dozens of files (https://github.com/Brevilabs/obsidian-copilot-private/issues/701)", () => {
       expect(buildAgentSystemPrompt(AGENT)).toContain(
         "Write via shell only to move, copy or delete files; to have a script rewrite most of a large file (sort, dedupe, recompute), not retyping it; or one mechanical change to dozens of files. Then list changed files."

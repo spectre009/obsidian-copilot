@@ -13,7 +13,7 @@ import { buildAgentSystemPrompt } from "./backends/shared/agentSystemPrompt";
 import { getBuiltinSkillEnvRestartPolicy } from "./backends/shared/builtinSkillEnv";
 import { vendorServicesTransition } from "@/vendorServices/vendorServicesPolicy";
 import { backendRegistry, listBackendDescriptors } from "./backends/registry";
-import type { BackendId } from "./session/types";
+import type { BackendDescriptor, BackendId } from "./session/types";
 import { AgentChatPersistenceManager } from "./session/AgentChatPersistenceManager";
 import { AgentModelPreloader } from "./session/AgentModelPreloader";
 import { AgentSessionIndex } from "./session/AgentSessionIndex";
@@ -382,11 +382,22 @@ export function createAgentSessionManager(app: App, plugin: CopilotPlugin): Agen
       logError("[Skills] Initial discovery pass failed", error);
     }
   );
+  // An installation check that settles after the startup pass would leave that agent without its
+  // built-in skills until an unrelated change re-seeds, because install changes during startup are
+  // ignored. https://github.com/spectre009/obsidian-copilot/issues/2
+  const seedIfReadyAfterStartupPass = async (descriptor: BackendDescriptor): Promise<void> => {
+    if (lastAvailableSkillAgents.includes(descriptor.id)) return;
+    if (descriptor.getInstallState(getSettings()).kind !== "ready") return;
+    await seedManagedBuiltins().catch((error) =>
+      logError(`[Skills] Seeding after ${descriptor.id} became ready failed`, error)
+    );
+  };
   for (const descriptor of listBackendDescriptors()) {
     const ready = Promise.resolve()
       .then(() => descriptor.onPluginLoad?.(plugin))
       .catch((e) => logError(`[AgentMode] backend ${descriptor.id} onPluginLoad failed`, e))
       .then(() => initialSkillsReady)
+      .then(() => seedIfReadyAfterStartupPass(descriptor))
       .finally(() => initializing.delete(descriptor.id));
     initializing.set(descriptor.id, ready);
     if (isAgentModeEnabled()) {

@@ -10,10 +10,16 @@ import {
 } from "./registry";
 import { ClaudeBackendDescriptor } from "./claude/descriptor";
 import { CodexBackendDescriptor } from "./codex/descriptor";
+import { GitHubCopilotBackendDescriptor } from "./github-copilot/descriptor";
 import { OpencodeBackendDescriptor } from "./opencode/descriptor";
+
+const GITHUB_COPILOT_ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/2";
 
 jest.mock("@/agentMode/backends/opencode/OpencodeInstallModal", () => ({
   OpencodeInstallModal: class {},
+}));
+jest.mock("@/agentMode/backends/github-copilot/GitHubCopilotInstallModal", () => ({
+  GitHubCopilotInstallModal: class {},
 }));
 jest.mock("@/components/modals/ConfirmModal", () => ({ ConfirmModal: class {} }));
 jest.mock("@/components/ui/setting-item", () => ({ SettingItem: () => null }));
@@ -39,8 +45,13 @@ describe("registry", () => {
     }) as unknown as CopilotSettings;
 
   describe("getActiveBackendDescriptor()", () => {
-    it("returns the OpenCode descriptor by default", () => {
+    it("returns the explicitly selected OpenCode descriptor", () => {
       expect(getActiveBackendDescriptor(baseSettings())).toBe(OpencodeBackendDescriptor);
+    });
+
+    it(`returns GitHub Copilot when no backend has been chosen ${GITHUB_COPILOT_ISSUE}`, () => {
+      const settings = { agentMode: { backends: {} } } as unknown as CopilotSettings;
+      expect(getActiveBackendDescriptor(settings)).toBe(GitHubCopilotBackendDescriptor);
     });
 
     it("returns the selected cloud agent even while Self-Host Mode is on", () => {
@@ -48,14 +59,17 @@ describe("registry", () => {
         ClaudeBackendDescriptor
       );
       expect(getActiveBackendDescriptor(baseSettings("codex", true))).toBe(CodexBackendDescriptor);
+      expect(getActiveBackendDescriptor(baseSettings("github-copilot", true))).toBe(
+        GitHubCopilotBackendDescriptor
+      );
     });
 
-    it("falls back to OpenCode when an unknown backend is selected", () => {
+    it(`falls back to GitHub Copilot when an unknown backend is selected ${GITHUB_COPILOT_ISSUE}`, () => {
       expect(getActiveBackendDescriptor(baseSettings("nonexistent"))).toBe(
-        OpencodeBackendDescriptor
+        GitHubCopilotBackendDescriptor
       );
       expect(getActiveBackendDescriptor(baseSettings("nonexistent", true))).toBe(
-        OpencodeBackendDescriptor
+        GitHubCopilotBackendDescriptor
       );
     });
   });
@@ -64,6 +78,7 @@ describe("registry", () => {
     it("lists every registered backend", () => {
       expect(listBackendDescriptors()).toEqual(
         expect.arrayContaining([
+          GitHubCopilotBackendDescriptor,
           OpencodeBackendDescriptor,
           ClaudeBackendDescriptor,
           CodexBackendDescriptor,
@@ -73,8 +88,9 @@ describe("registry", () => {
   });
 
   describe("backendDisplayOrder()", () => {
-    it("lists opencode, then Claude, then Codex", () => {
+    it(`lists GitHub Copilot first, then OpenCode, Claude and Codex ${GITHUB_COPILOT_ISSUE}`, () => {
       expect(backendDisplayOrder()).toEqual([
+        GitHubCopilotBackendDescriptor,
         OpencodeBackendDescriptor,
         ClaudeBackendDescriptor,
         CodexBackendDescriptor,
@@ -92,8 +108,9 @@ describe("registry", () => {
   });
 
   describe("RECOMMENDED_BACKEND_ID", () => {
-    it("names a registered backend", () => {
-      expect(backendRegistry[RECOMMENDED_BACKEND_ID]).toBeDefined();
+    it(`recommends GitHub Copilot, which needs no vendor service or API key ${GITHUB_COPILOT_ISSUE}`, () => {
+      expect(RECOMMENDED_BACKEND_ID).toBe("github-copilot");
+      expect(backendRegistry[RECOMMENDED_BACKEND_ID]).toBe(GitHubCopilotBackendDescriptor);
     });
   });
 
@@ -103,20 +120,22 @@ describe("registry", () => {
       expect(backendNeedsSelfHostWarning(OpencodeBackendDescriptor, off)).toBe(false);
       expect(backendNeedsSelfHostWarning(ClaudeBackendDescriptor, off)).toBe(false);
       expect(backendNeedsSelfHostWarning(CodexBackendDescriptor, off)).toBe(false);
+      expect(backendNeedsSelfHostWarning(GitHubCopilotBackendDescriptor, off)).toBe(false);
     });
 
-    it("warns on cloud agents (Claude, Codex) but not opencode when Self-Host Mode is on", () => {
+    it("warns on cloud agents (Claude, Codex, GitHub Copilot) but not opencode when Self-Host Mode is on", () => {
       const on = baseSettings("opencode", true);
       expect(backendNeedsSelfHostWarning(OpencodeBackendDescriptor, on)).toBe(false);
       expect(backendNeedsSelfHostWarning(ClaudeBackendDescriptor, on)).toBe(true);
       expect(backendNeedsSelfHostWarning(CodexBackendDescriptor, on)).toBe(true);
+      expect(backendNeedsSelfHostWarning(GitHubCopilotBackendDescriptor, on)).toBe(true);
     });
   });
 
   describe("getCloudAgentIds()", () => {
     it("contains exactly the non-self-hostable backends and returns the same set on every call", () => {
       const ids = getCloudAgentIds();
-      expect([...ids].sort()).toEqual(["claude", "codex"]);
+      expect([...ids].sort()).toEqual(["claude", "codex", "github-copilot"]);
       expect(getCloudAgentIds()).toBe(ids);
     });
   });

@@ -765,7 +765,7 @@ export const DEFAULT_SETTINGS: CopilotSettings = {
   convertedDocOutputFolder: DEFAULT_CONVERTED_DOC_OUTPUT_FOLDER,
   agentMode: {
     byok: {},
-    activeBackend: "opencode",
+    activeBackend: "github-copilot",
     backends: {},
     debugFullFrames: true,
     offerFeedbackCards: true,

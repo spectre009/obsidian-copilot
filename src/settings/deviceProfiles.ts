@@ -18,6 +18,7 @@ function omitKeys<T extends object>(obj: T, keys: readonly string[]): T {
 
 const CODEX_DEVICE_KEYS = ["binaryPath", "binaryVersion", "binarySource", "envOverrides"] as const;
 const CLAUDE_DEVICE_KEYS = ["envOverrides"] as const;
+const GITHUB_COPILOT_DEVICE_KEYS = ["binaryPath", "envOverrides"] as const;
 const OPENCODE_DEVICE_KEYS = [
   "binaryPath",
   "binaryVersion",
@@ -62,6 +63,14 @@ function buildProfileFromFlat(agentMode: AgentMode): DeviceAgentProfile {
     profile.claude = { envOverrides: claudeSrc.envOverrides };
   }
 
+  const githubCopilotSrc = agentMode.backends?.["github-copilot"];
+  if (githubCopilotSrc) {
+    const githubCopilot: NonNullable<DeviceAgentProfile["github-copilot"]> = {};
+    if (githubCopilotSrc.binaryPath) githubCopilot.binaryPath = githubCopilotSrc.binaryPath;
+    if (githubCopilotSrc.envOverrides) githubCopilot.envOverrides = githubCopilotSrc.envOverrides;
+    if (hasOwnKeys(githubCopilot)) profile["github-copilot"] = githubCopilot;
+  }
+
   return profile;
 }
 
@@ -80,6 +89,10 @@ function stripDeviceFieldsFromBackends(backends: Backends | undefined): Backends
   if (backends.opencode) {
     const synced = omitKeys(backends.opencode, OPENCODE_DEVICE_KEYS);
     if (hasOwnKeys(synced)) out.opencode = synced;
+  }
+  if (backends["github-copilot"]) {
+    const synced = omitKeys(backends["github-copilot"], GITHUB_COPILOT_DEVICE_KEYS);
+    if (hasOwnKeys(synced)) out["github-copilot"] = synced;
   }
   return out;
 }
@@ -114,6 +127,12 @@ export function hydrateDeviceProfile(settings: CopilotSettings, deviceId: string
   if (profile?.codex) nextBackends.codex = { ...nextBackends.codex, ...profile.codex };
   if (profile?.opencode) nextBackends.opencode = { ...nextBackends.opencode, ...profile.opencode };
   if (profile?.claude) nextBackends.claude = { ...nextBackends.claude, ...profile.claude };
+  if (profile?.["github-copilot"]) {
+    nextBackends["github-copilot"] = {
+      ...nextBackends["github-copilot"],
+      ...profile["github-copilot"],
+    };
+  }
 
   const nextAgentMode: AgentMode = {
     ...agentMode,

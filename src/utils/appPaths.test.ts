@@ -2,7 +2,7 @@ import type { App } from "obsidian";
 import { FileSystemAdapter, Platform } from "obsidian";
 import * as path from "node:path";
 import { md5 } from "@/utils/hash";
-import { copilotAppDataDir, getVaultId } from "./appPaths";
+import { copilotAppDataDir, getVaultId, vaultIdFromBasePath } from "./appPaths";
 
 describe("appPaths", () => {
   describe("copilotAppDataDir()", () => {
@@ -18,6 +18,18 @@ describe("appPaths", () => {
       } finally {
         platform.isMobile = false;
       }
+    });
+  });
+
+  describe("vaultIdFromBasePath()", () => {
+    it("matches getVaultId() for the same vault, so code holding only the base path finds the same per-vault folders", () => {
+      const FsAdapter = FileSystemAdapter as unknown as new (basePath: string) => FileSystemAdapter;
+      const app = { vault: { adapter: new FsAdapter("C:\\Vaults\\Work") } } as unknown as App;
+      expect(vaultIdFromBasePath("C:\\Vaults\\Work")).toBe(getVaultId(app));
+    });
+
+    it('is "default" for an empty base path', () => {
+      expect(vaultIdFromBasePath("")).toBe("default");
     });
   });
 

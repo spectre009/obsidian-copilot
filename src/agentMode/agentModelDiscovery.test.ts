@@ -193,6 +193,25 @@ describe("agentModelDiscovery", () => {
       unsub();
     });
 
+    it("registers GitHub Copilot's whole multi-vendor catalog as one OpenAI-compatible agent provider, all enabled (https://github.com/spectre009/obsidian-copilot/issues/2)", async () => {
+      mockDescriptors = [makeDescriptor({ id: "github-copilot", displayName: "GitHub Copilot" })];
+      const m = makeManagerFake();
+      const a = makeApiFake();
+      m.setCatalog("github-copilot", catalogWithModels(["claude-sonnet-5.5", "gpt-5.6-sol"]));
+
+      const unsub = wireAgentModelDiscovery(makePlugin(a.api), m.manager);
+      await waitForDiscoveryLog("first enrollment for github-copilot");
+
+      expect(a.registerAgentProvider.mock.calls[0][0]).toMatchObject({
+        agentType: "github-copilot",
+        providerType: "openai-compatible",
+        displayName: "GitHub Copilot",
+        wireModelIds: ["claude-sonnet-5.5", "gpt-5.6-sol"],
+        autoEnrollModelIds: undefined,
+      });
+      unsub();
+    });
+
     it("registers only the OpenCode models whose provider is not already managed by BYOK", async () => {
       mockDescriptors = [makeDescriptor({ id: "opencode" })];
       const m = makeManagerFake();

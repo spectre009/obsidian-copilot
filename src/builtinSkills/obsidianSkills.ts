@@ -36,7 +36,7 @@ name: obsidian-markdown
 description: Create and edit Obsidian-specific Markdown syntax, including wikilinks, embeds, block references and block IDs, callouts, properties, tags, aliases, and comments. Load before adding or changing any of these in a note.
 license: MIT
 metadata:
-  copilot-enabled-agents: claude, codex, opencode
+  copilot-enabled-agents: claude, codex, github-copilot, opencode
   copilot-builtin-version: "${FORMAT_SKILL_VERSION}"
   copilot-upstream-revision: "${OBSIDIAN_SKILLS_UPSTREAM_REVISION}"
 ---
@@ -215,7 +215,7 @@ name: obsidian-bases
 description: Create and edit Obsidian Bases (.base files) with valid YAML schemas, filters, formulas, properties, summaries, and views. Use for database-like Obsidian views or when the user mentions Bases, .base files, table/card/list views, filters, formulas, or summaries.
 license: MIT
 metadata:
-  copilot-enabled-agents: claude, codex, opencode
+  copilot-enabled-agents: claude, codex, github-copilot, opencode
   copilot-builtin-version: "${FORMAT_SKILL_VERSION}"
   copilot-upstream-revision: "${OBSIDIAN_SKILLS_UPSTREAM_REVISION}"
 ---
@@ -440,7 +440,7 @@ name: json-canvas
 description: Create and edit JSON Canvas (.canvas) files with valid nodes, edges, groups, colors, layout, IDs, and referential integrity. Use for Obsidian Canvas files, visual maps, flowcharts, project boards, or any request involving the JSON Canvas format.
 license: MIT
 metadata:
-  copilot-enabled-agents: claude, codex, opencode
+  copilot-enabled-agents: claude, codex, github-copilot, opencode
   copilot-builtin-version: "${FORMAT_SKILL_VERSION}"
   copilot-upstream-revision: "${OBSIDIAN_SKILLS_UPSTREAM_REVISION}"
 ---
@@ -611,7 +611,7 @@ name: obsidian-cli
 description: Use the official Obsidian CLI when a task needs Obsidian's running app, index, configured features, command registry, or developer runtime. Use for currently open notes and tabs, workspace state, daily notes, typed properties, tasks, links/backlinks, Bases queries, template resolution, link-aware moves, plugin commands, and plugin/theme debugging; do not use it for ordinary filesystem operations.
 license: MIT
 metadata:
-  copilot-enabled-agents: claude, codex, opencode
+  copilot-enabled-agents: claude, codex, github-copilot, opencode
   copilot-builtin-version: "${OBSIDIAN_CLI_VERSION}"
   copilot-upstream-revision: "${OBSIDIAN_SKILLS_UPSTREAM_REVISION}"
 ---

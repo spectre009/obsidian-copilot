@@ -1,6 +1,6 @@
 # Windows setup for Agent Chat
 
-Agent Chat runs in the Obsidian desktop app. On Windows, start with **opencode** unless you already use Claude Code or Codex.
+Agent Chat runs in the Obsidian desktop app. On Windows, start with **GitHub Copilot** if you have a GitHub Copilot plan, otherwise with **opencode** unless you already use Claude Code or Codex.
 
 ## 1. Install opencode with Copilot
 
@@ -44,9 +44,17 @@ For manual installations, the Codex backend needs a supported `@agentclientproto
 
 You can also choose **Sign in to Codex** on the Agent Chat status card. For terminal login, run your configured adapter with `cli login` using the same `CODEX_HOME` as Copilot.
 
+## 4. Connect GitHub Copilot
+
+1. In PowerShell, run `winget install GitHub.Copilot`, then `copilot login` and sign in with your GitHub account.
+2. Open **Settings → Copilot → Basic → Agents → GitHub Copilot**. Copilot finds `copilot.exe` on your PATH or in the WinGet install folder. If it is not found, open **Configure** and select **Auto-detect** or enter the path to `copilot.exe`.
+3. Choose a **Default model** and set **Default backend** to **GitHub Copilot**.
+
+Copilot runs the native `copilot.exe`. The `copilot.cmd` launcher that `npm install -g @github/copilot` creates can't be started without a shell, so Copilot does not use it. Update the CLI with `winget upgrade GitHub.Copilot`. See [GitHub Copilot setup](agent-mode-and-tools.md#github-copilot).
+
 ## Share Skills across agents
 
-Open [**Settings → Copilot → Skills**](settings.md#skills) and toggle the opencode, Claude, or Codex icons for each Skill. Copilot keeps one shared copy and creates folder links into `.opencode/skills/`, `.claude/skills/`, and `.agents/skills/`.
+Open [**Settings → Copilot → Skills**](settings.md#skills) and toggle the opencode, Claude, Codex, or GitHub Copilot icons for each Skill. Copilot keeps one shared copy and creates folder links into `.opencode/skills/`, `.claude/skills/`, `.agents/skills/`, and `.github/skills/`.
 
 Windows may block creation of these links. Enable **Windows Settings → Privacy & security → For developers → Developer Mode**, or run Obsidian with administrator access, then toggle the affected agent off and on in the **Skills** tab.
 

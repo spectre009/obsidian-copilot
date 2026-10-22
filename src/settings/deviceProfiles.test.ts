@@ -219,6 +219,39 @@ describe("deviceProfiles", () => {
       expect(restored.agentMode.backends.codex?.defaultModel?.baseModelId).toBe("gpt-5");
     });
 
+    it("keeps GitHub Copilot's CLI path and environment on their device while its model and mode sync (https://github.com/spectre009/obsidian-copilot/issues/2)", () => {
+      const settings = makeSettings(
+        makeAgentMode({
+          backends: {
+            "github-copilot": {
+              binaryPath: "C:\\cli\\copilot.exe",
+              envOverrides: { HTTPS_PROXY: "http://proxy:8080" },
+              defaultModel: { baseModelId: "claude-sonnet-5.5", effort: "low" },
+              defaultMode: "default",
+            },
+          },
+        })
+      );
+
+      const disk = dehydrateDeviceProfile(settings, DEVICE_A);
+      expect(disk.agentMode.backends["github-copilot"]).toEqual({
+        defaultModel: { baseModelId: "claude-sonnet-5.5", effort: "low" },
+        defaultMode: "default",
+      });
+      expect(disk.agentMode.deviceProfiles?.[DEVICE_A]?.["github-copilot"]).toEqual({
+        binaryPath: "C:\\cli\\copilot.exe",
+        envOverrides: { HTTPS_PROXY: "http://proxy:8080" },
+      });
+
+      expect(hydrateDeviceProfile(disk, DEVICE_A).agentMode.backends["github-copilot"]).toEqual(
+        settings.agentMode.backends["github-copilot"]
+      );
+      expect(hydrateDeviceProfile(disk, DEVICE_B).agentMode.backends["github-copilot"]).toEqual({
+        defaultModel: { baseModelId: "claude-sonnet-5.5", effort: "low" },
+        defaultMode: "default",
+      });
+    });
+
     it("isolates devices: a path configured on A is invisible to B but survives B's save", () => {
       const aDisk = dehydrateDeviceProfile(
         makeSettings(makeAgentMode({ claudeCli: { path: "/a/claude" } })),

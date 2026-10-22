@@ -30,11 +30,16 @@ describe("obsidianSkills", () => {
       ]);
     });
 
-    it("parses each SKILL.md with the same validator used by discovery", () => {
+    it("parses each SKILL.md with the same validator used by discovery, listing every agent including GitHub Copilot (https://github.com/spectre009/obsidian-copilot/issues/2)", () => {
       for (const skill of OBSIDIAN_SKILLS) {
         const parsed = parseSkillFile(skill.skillMd, skill.name);
         expect(parsed.frontmatter.name).toBe(skill.name);
-        expect(parsed.frontmatter.enabledAgents).toEqual(["claude", "codex", "opencode"]);
+        expect(parsed.frontmatter.enabledAgents).toEqual([
+          "claude",
+          "codex",
+          "github-copilot",
+          "opencode",
+        ]);
       }
     });
 

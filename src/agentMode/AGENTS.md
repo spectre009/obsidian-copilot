@@ -47,7 +47,7 @@ imports outside `acp/` are blocked by lint
 
 Pick a track based on what the agent gives you:
 
-- **Subprocess track** (codex, opencode) — the agent speaks ACP
+- **Subprocess track** (codex, opencode, github-copilot) — the agent speaks ACP
   over stdio. Implement `AcpBackend` in `Backend.ts` and have the
   descriptor's `createBackendProcess(args)` call
   `simpleBinaryBackendProcess(args, new <Id>Backend())` from

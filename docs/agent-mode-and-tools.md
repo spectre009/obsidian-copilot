@@ -12,15 +12,37 @@ Your sent messages display Markdown formatting, including headings, lists, code 
 
 Open [**Settings → Copilot → Basic → Agents**](settings.md#basic). Configure at least one agent, then choose the **Default backend** for new chats.
 
-| Agent        | Best starting point                             | Where model access comes from                                              |
-| ------------ | ----------------------------------------------- | -------------------------------------------------------------------------- |
-| **opencode** | Recommended for most people                     | Copilot-hosted models, your API providers, or local OpenAI-compatible APIs |
-| **Claude**   | You already use Claude Code                     | Your Claude Code installation and Anthropic account                        |
-| **Codex**    | You already use the Codex CLI and Codex account | Your Codex CLI login through the `codex-acp` adapter                       |
+| Agent              | Best starting point                               | Where model access comes from                                              |
+| ------------------ | ------------------------------------------------- | -------------------------------------------------------------------------- |
+| **GitHub Copilot** | Recommended when you have a GitHub Copilot plan   | Your GitHub Copilot CLI sign-in and Copilot plan                           |
+| **opencode**       | You want Copilot-hosted, API-key, or local models | Copilot-hosted models, your API providers, or local OpenAI-compatible APIs |
+| **Claude**         | You already use Claude Code                       | Your Claude Code installation and Anthropic account                        |
+| **Codex**          | You already use the Codex CLI and Codex account   | Your Codex CLI login through the `codex-acp` adapter                       |
 
 For opencode and Codex, **Managed by Copilot** uses the version Copilot tests. **My own binary** remains available, but other versions may not work correctly with Copilot. The Configure dialog reminds you of this when you choose your own binary.
 
 A one-agent chat can work without a Copilot license when you bring your own model access. An eligible paid plan adds Copilot-hosted models and cloud-backed features. [Compare Copilot plans](copilot-plus-and-self-host.md).
+
+### GitHub Copilot
+
+The GitHub Copilot backend runs the GitHub Copilot CLI installed on your computer, with its sign-in and your GitHub Copilot plan. It needs no Copilot license and no API key.
+
+1. Install the CLI: `winget install GitHub.Copilot` on Windows, `brew install --cask copilot-cli` on macOS, or `curl -fsSL https://gh.io/copilot-install | bash` on Linux. On Windows, Copilot runs the native `copilot.exe`; the `copilot.cmd` launcher that npm installs is not supported.
+2. Sign in once from a terminal with `copilot login`. The sign-in is shared with the CLI you use in your terminal.
+3. Open **Basic → Agents → GitHub Copilot → Configure**. Copilot finds the CLI on your PATH or, on Windows, in the WinGet install folder. Select **Auto-detect** or enter its absolute path if needed.
+4. Enable the models you want and choose a default.
+
+Copilot requires GitHub Copilot CLI 1.0.102 or newer and runs exactly the installed version; the CLI does not update itself while Copilot uses it. Update it with `winget upgrade GitHub.Copilot` or your package manager, then reload Copilot.
+
+Each turn counts against your GitHub Copilot plan at the selected model's premium-request rate. Models added under **BYOK** do not join the GitHub Copilot model list.
+
+Each vault gets its own GitHub Copilot folder outside the vault, `~/.obsidian-copilot/github-copilot/<vault id>`. The CLI keeps its sessions, logs, and settings there, and Copilot writes its Agent Chat instructions there as `copilot-instructions.md`. Your personal `~/.copilot` folder, with its instructions, custom agents, MCP servers, hooks, and plugins, is not used. Your vault's `AGENTS.md` instructions and Copilot Skills still apply. Copilot also ignores environment variables that would change the CLI's sign-in, model routing, approvals, or telemetry (`COPILOT_*`, `GH_TOKEN`, `GITHUB_TOKEN`, and `OTEL_*`). `GH_HOST`, `COPILOT_GH_HOST`, and proxy settings still apply.
+
+Some things still reach the agent from outside the vault:
+
+- The CLI also reads Skills from `.agents/skills`, `.claude/skills`, and `.github/skills` folders in the folders above the vault. A vault inside your home folder therefore also gets your personal `~/.agents/skills`, and a vault inside a git repository gets that repository's Skills.
+- The CLI's built-in GitHub MCP server is available to the agent.
+- The CLI's own slash commands work when you type them, including `/allow-all` and `/autopilot`, which turn off approval prompts for the chat.
 
 ### opencode
 
@@ -118,7 +140,9 @@ The permission picker shows only choices supported by the current agent:
 | **Plan** | Drafts a plan and waits for your approval before editing when the current agent supports this choice |
 | **Auto** | Reduces approval prompts according to the current agent's automatic permission rule                  |
 
-opencode supports **Safe** and **Auto**. Claude supports **Safe**, **Plan**, and **Auto**. Codex shows the choices supported by the installed adapter. Claude also has an **Auto mode permissions** setting that controls how much Auto may approve.
+opencode supports **Safe** and **Auto**. Claude supports **Safe**, **Plan**, and **Auto**. Codex shows the choices supported by the installed adapter. GitHub Copilot supports **Safe** only: its Plan mode finishes without asking you to approve the plan, and its Autopilot approves everything. Claude also has an **Auto mode permissions** setting that controls how much Auto may approve.
+
+With GitHub Copilot, **Safe** asks before shell commands and file changes. Reading files and read-only tools run without asking, and **Always allow** lasts until the chat ends.
 
 With Codex, **Safe** uses the adapter's **Ask for approval** preset. It can edit files in the working directory; the adapter asks before editing external files or using the internet. **Auto** uses automatic review within the same workspace-write sandbox, without enabling full access. **Plan** uses Auto's approval preset while Codex drafts a plan and waits for your approval. Once you approve it, Codex continues in **Auto** mode to implement the plan.
 
@@ -130,7 +154,7 @@ When Claude or Codex asks a set of questions, answer the current tab and select 
 
 Codex can ask questions while the permission picker is on **Safe**, **Plan**, or **Auto**. You do not need to switch to Plan to answer a question.
 
-OpenCode does not show question cards yet. If it asks a clarifying question in chat, answer in the message box.
+OpenCode and GitHub Copilot do not show question cards. If they ask a clarifying question in chat, answer in the message box.
 
 Permission and question cards stay in a scrolling action area above the message box until you answer them, even while the response continues streaming.
 
@@ -151,7 +175,7 @@ Agent Chat keeps each conversation separate:
 - Select **More actions** above the composer and choose **Copy chat link** to copy an `obsidian://` link to the current conversation. Paste it into another note to reopen the chat in the same vault. The link points to the conversation's Markdown note, so Copilot saves the note first if it does not exist yet, including when autosave is off. The link keeps working after the note is renamed. To copy a link without opening the chat, hover it in **Recent Chats**, select **More actions**, and choose **Copy chat link**. A chat that has no note yet is saved as one first.
 - Properties you add to an Agent chat note stay when Copilot saves the chat again. Copilot updates only the properties it manages: the agent, session, project, token usage, and tags.
 - A spinner marks a chat while its agent is responding. When the response stops but the session remains live, a small blue dot appears on the bottom-right corner of the chat icon. Hover the row and select **Close session** to release that session. Saved history stays available to reopen, and other chats keep running. If the agent does not support closing individual sessions or release fails, the chat stays marked live with an error.
-- Deleting an Agent chat removes Copilot's chat note and its entry in Copilot's chat history. Claude Code, Codex, and opencode may keep their own copy of the conversation on your computer. Copilot does not delete or change those files, so you can still resume the chat in that agent's own tool. The confirmation and the notice after the delete both say this. Deleting an open chat closes it and stops any reply in progress.
+- Deleting an Agent chat removes Copilot's chat note and its entry in Copilot's chat history. Claude Code, Codex, GitHub Copilot CLI, and opencode may keep their own copy of the conversation on your computer. Copilot does not delete or change those files, so you can still resume the chat in that agent's own tool. The confirmation and the notice after the delete both say this. Deleting an open chat closes it and stops any reply in progress.
 - Add the active note, selected text, other notes, folders, a Copilot Web Viewer tab, or supported images. You can also mention a note with `[[Note title]]`.
 - Hover the context ring beside the send controls to see how much of the model's context window is in use. The ring stays empty until the agent reports usage, and a stopped response keeps the last reported reading. If the connected account reports usage limits, the same panel shows the available limit and reset time.
 
@@ -221,13 +245,13 @@ The default model and effort saved for each mentioned agent are used for its ans
 
 ## Skills across agents
 
-Skills are reusable instruction packets built around a `SKILL.md` file. One Skill can be made available to opencode, Claude, and Codex without maintaining three copies.
+Skills are reusable instruction packets built around a `SKILL.md` file. One Skill can be made available to opencode, Claude, Codex, and GitHub Copilot without maintaining separate copies.
 
 1. Open [**Settings → Copilot → Skills**](settings.md#skills).
-2. Find a Skill and toggle the opencode, Claude, or Codex icons for the agents that should use it.
+2. Find a Skill and toggle the opencode, Claude, Codex, or GitHub Copilot icons for the agents that should use it.
 3. Type `/` in Agent Chat to choose it, or describe the task and let the agent select an enabled Skill.
 
-Shared Skills live under `<Copilot folder>/skills/`. Copilot links them into the native folders used by each agent: `.opencode/skills/`, `.claude/skills/`, and `.agents/skills/`. Skills already present in those native folders also appear in the settings list.
+Shared Skills live under `<Copilot folder>/skills/`. Copilot links them into the native folders used by each agent: `.opencode/skills/`, `.claude/skills/`, `.agents/skills/`, and `.github/skills/`. Skills already present in those native folders also appear in the settings list. GitHub Copilot also reads `.claude/skills/` and `.agents/skills/`, so a Skill turned off for GitHub Copilot still reaches it while it stays on for Claude or Codex.
 
 The **Built-in Skills** table contains Copilot's bundled skills with read-only previews. Turn off a whole skill to remove its generated files, or turn off an individual agent to exclude it. These choices survive restarts and updates. Copilot generates built-in skills only when an available agent can use them. Setting up another agent enables eligible built-ins for that agent unless you previously opted out. Your own skills remain editable in **Your Skills**.
 
@@ -235,7 +259,7 @@ Custom Skills and built-in Obsidian Skills are free. Active Plus access adds clo
 
 The web search and web fetch Skills (`copilot-web-search` and `copilot-web-fetch`) start turned off in new installs, so agents use their own web tools. Turn them on in **Built-in Skills** to route those requests through Copilot instead.
 
-The Obsidian Skills (`obsidian-markdown`, `obsidian-bases`, `json-canvas`, and `obsidian-cli`) start turned on for opencode in new installs, and `obsidian-bases` also for Codex. Turn them on for other agents in **Built-in Skills**. `obsidian-cli` works only while **Command line interface** is on in Obsidian's **Settings → General**; while it is off, agents do not receive that Skill.
+The Obsidian Skills (`obsidian-markdown`, `obsidian-bases`, `json-canvas`, and `obsidian-cli`) start turned on for opencode and GitHub Copilot in new installs, and `obsidian-bases` also for Codex. Turn them on for other agents in **Built-in Skills**. `obsidian-cli` works only while **Command line interface** is on in Obsidian's **Settings → General**; while it is off, agents do not receive that Skill.
 
 While **Miyo document processing** is on, which is the default, agents read PDF and EPUB files through Copilot's Miyo parse tool, which asks the connected Miyo to parse them and does not need Plus access. The tool is available only while Miyo is connected. With a remote Miyo server, files in the vault parse on that server, and files outside the vault can't be parsed. If Miyo cannot parse a file, the agent tells you and reads the file with its own tools. With **Miyo document processing** off, agents read documents with their own tools.
 

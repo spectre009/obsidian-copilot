@@ -1,21 +1,21 @@
 # Copilot for Obsidian V4
 
-Copilot V4 starts with **Agent Chat**, where opencode, Claude Code, or Codex can read your vault, use tools, and complete multi-step work with your approval. Quick Ask, Copilot Commands, and Quick Chat remain available for smaller jobs and mobile use.
+Copilot V4 starts with **Agent Chat**, where GitHub Copilot, opencode, Claude Code, or Codex can read your vault, use tools, and complete multi-step work with your approval. Quick Ask, Copilot Commands, and Quick Chat remain available for smaller jobs and mobile use.
 
 ## Start here
 
 1. Install Copilot from Obsidian's Community Plugins.
-2. Open **Settings → Copilot → Basic → Agents**. Follow [Getting Started with Copilot V4](getting-started.md) to download managed opencode or Codex, or auto-detect Claude Code.
+2. Open **Settings → Copilot → Basic → Agents**. Follow [Getting Started with Copilot V4](getting-started.md) to link the GitHub Copilot CLI, download managed opencode or Codex, or auto-detect Claude Code.
 3. Run **Open Copilot Agent Chat Window**. A ready default agent opens automatically; if **Select your agent** appears, choose an **Installed** agent and select **Start chat**.
 
-For most people, opencode is the best starting point. Copilot can install and manage both opencode and the Codex adapter; Claude Code and Codex use their existing command-line accounts. Windows users can also follow [Windows setup for Agent Chat](agent-mode-windows-setup.md).
+If you have a GitHub Copilot plan, GitHub Copilot is the best starting point; otherwise start with opencode. Copilot can install and manage both opencode and the Codex adapter; Claude Code and Codex use their existing command-line accounts. Windows users can also follow [Windows setup for Agent Chat](agent-mode-windows-setup.md).
 
 ## Agent Chat
 
 - [Agent Chat](agent-mode-and-tools.md) explains agents, models, permissions, sessions, and safe use.
-- [Choose an agent](agent-mode-and-tools.md#choose-an-agent) for opencode, Claude Code, or Codex.
+- [Choose an agent](agent-mode-and-tools.md#choose-an-agent) for GitHub Copilot, opencode, Claude Code, or Codex.
 - [Ask multiple agents](agent-mode-and-tools.md#multi-agent-answers) to research or review the same question in parallel.
-- [Share Skills across agents](agent-mode-and-tools.md#skills-across-agents) so one reusable workflow works in opencode, Claude Code, and Codex.
+- [Share Skills across agents](agent-mode-and-tools.md#skills-across-agents) so one reusable workflow works in opencode, Claude Code, Codex, and GitHub Copilot.
 - [Projects](projects.md) give ongoing work its own instructions, context, and chat history.
 - [Context and Mentions](context-and-mentions.md) add notes, selections, folders, URLs, and other agents to a request.
 - [Instructions for Agent Chat and Quick Chat](system-prompts.md) and [`AGENTS.md` examples](agents-md-examples.md) set durable guidance for your vault and projects.

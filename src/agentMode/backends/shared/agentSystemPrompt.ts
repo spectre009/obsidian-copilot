@@ -62,6 +62,7 @@ export const COPILOT_PROMPT_BASE = `You are Obsidian Copilot, working in the use
 const FILE_EDIT_TOOLS: Readonly<Record<BackendId, string>> = {
   claude: "Edit/Write",
   codex: "apply_patch",
+  "github-copilot": "edit/create/apply_patch",
   opencode: "edit/write/patch",
 };
 

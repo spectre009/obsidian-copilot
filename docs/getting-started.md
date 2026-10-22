@@ -1,6 +1,6 @@
 # Getting Started with Copilot V4
 
-Copilot V4 is built around **Agent Chat**, a desktop workspace where opencode, Claude Code, or Codex can read your vault, use tools, and complete multi-step work with the permissions you choose.
+Copilot V4 is built around **Agent Chat**, a desktop workspace where GitHub Copilot, opencode, Claude Code, or Codex can read your vault, use tools, and complete multi-step work with the permissions you choose.
 
 Agent Chat is available in Obsidian on desktop. Quick Chat, Copilot Commands, and Quick Ask remain available for shorter tasks and on mobile.
 
@@ -12,9 +12,18 @@ Agent Chat is available in Obsidian on desktop. Quick Chat, Copilot Commands, an
 
 ## Set Up Your First Agent Chat
 
-Open **Settings → Copilot → Basic** and find **Agents**. For most people, the quickest path is the managed opencode setup.
+Open **Settings → Copilot → Basic** and find **Agents**. If you have a GitHub Copilot plan, link the GitHub Copilot CLI; otherwise the quickest path is the managed opencode setup.
 
-### Recommended: Download opencode
+### Recommended: Link GitHub Copilot
+
+1. Install the GitHub Copilot CLI: `winget install GitHub.Copilot` on Windows, `brew install --cask copilot-cli` on macOS, or `curl -fsSL https://gh.io/copilot-install | bash` on Linux.
+2. Run `copilot login` in a terminal and sign in with your GitHub account.
+3. Open **Basic → Agents → GitHub Copilot → Configure**. Copilot finds the installed CLI automatically; select **Auto-detect** if it is not found.
+4. Choose the default model for new chats.
+
+GitHub Copilot uses the account held by the GitHub Copilot CLI and bills chats to your Copilot plan. It keeps its own settings for each vault, separate from your personal `~/.copilot` folder. See [GitHub Copilot setup](agent-mode-and-tools.md#github-copilot).
+
+### Alternative: Download opencode
 
 1. Select the **opencode** tab under **Agents**.
 2. Open **Configure**, choose **Managed by Copilot**, then click **Download & install**. Copilot downloads the `opencode` binary and manages it for you.

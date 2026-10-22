@@ -136,6 +136,7 @@ export interface CopilotSettings {
       opencode?: OpencodeBackendSettings;
       claude?: ClaudeBackendSettings;
       codex?: CodexBackendSettings;
+      "github-copilot"?: GitHubCopilotBackendSettings;
     };
     // Keyed by device id because binary paths must not sync across devices:
     // https://github.com/logancyang/obsidian-copilot/issues/2539
@@ -191,6 +192,15 @@ export interface OpencodeBackendSettings {
   envOverrides?: Record<string, string>;
 }
 
+export interface GitHubCopilotBackendSettings {
+  // Unset means Copilot finds the installed CLI on each start rather than pinning a detected path.
+  // https://github.com/spectre009/obsidian-copilot/issues/2
+  binaryPath?: string;
+  defaultModel?: ModelSelection | null;
+  defaultMode?: CopilotMode | null;
+  envOverrides?: Record<string, string>;
+}
+
 export interface DeviceAgentProfile {
   claudeCliPath?: string;
   codex?: {
@@ -207,6 +217,10 @@ export interface DeviceAgentProfile {
     envOverrides?: Record<string, string>;
   };
   claude?: {
+    envOverrides?: Record<string, string>;
+  };
+  "github-copilot"?: {
+    binaryPath?: string;
     envOverrides?: Record<string, string>;
   };
 }
@@ -806,17 +820,24 @@ function sanitizeAgentMode(raw: unknown): CopilotSettings["agentMode"] {
   const existingOpencode = backendsRaw.opencode as Record<string, unknown> | undefined;
   const existingClaude = backendsRaw.claude as Record<string, unknown> | undefined;
   const existingCodex = backendsRaw.codex as Record<string, unknown> | undefined;
+  const existingGitHubCopilot = backendsRaw["github-copilot"] as
+    | Record<string, unknown>
+    | undefined;
 
   const opencodeSlice = existingOpencode
     ? sanitizeOpencodeBackendSettings(existingOpencode)
     : undefined;
   const claudeSlice = existingClaude ? sanitizeClaudeBackendSettings(existingClaude) : undefined;
   const codexSlice = existingCodex ? sanitizeCodexBackendSettings(existingCodex) : undefined;
+  const githubCopilotSlice = existingGitHubCopilot
+    ? sanitizeGitHubCopilotBackendSettings(existingGitHubCopilot)
+    : undefined;
 
   const backends: CopilotSettings["agentMode"]["backends"] = {};
   if (opencodeSlice) backends.opencode = opencodeSlice;
   if (claudeSlice) backends.claude = claudeSlice;
   if (codexSlice) backends.codex = codexSlice;
+  if (githubCopilotSlice) backends["github-copilot"] = githubCopilotSlice;
 
   const deviceProfiles = sanitizeDeviceProfiles(r.deviceProfiles);
 
@@ -1139,6 +1160,17 @@ function sanitizeOpencodeBackendSettings(raw: unknown): OpencodeBackendSettings 
   };
 }
 
+function sanitizeGitHubCopilotBackendSettings(raw: unknown): GitHubCopilotBackendSettings {
+  if (!raw || typeof raw !== "object") return {};
+  const r = raw as Record<string, unknown>;
+  return {
+    binaryPath: nonEmptyString(r.binaryPath),
+    defaultModel: sanitizeDefaultModel(r.defaultModel),
+    defaultMode: sanitizeDefaultMode(r.defaultMode),
+    envOverrides: sanitizeEnvOverrides(r.envOverrides),
+  };
+}
+
 function sanitizeDeviceAgentProfile(raw: unknown): DeviceAgentProfile | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
@@ -1188,6 +1220,19 @@ function sanitizeDeviceAgentProfile(raw: unknown): DeviceAgentProfile | undefine
   if (claudeRaw) {
     const envOverrides = sanitizeEnvOverrides(claudeRaw.envOverrides);
     if (envOverrides) out.claude = { envOverrides };
+  }
+
+  const githubCopilotRaw =
+    r["github-copilot"] && typeof r["github-copilot"] === "object"
+      ? (r["github-copilot"] as Record<string, unknown>)
+      : null;
+  if (githubCopilotRaw) {
+    const githubCopilot: NonNullable<DeviceAgentProfile["github-copilot"]> = {};
+    const binaryPath = nonEmptyString(githubCopilotRaw.binaryPath);
+    if (binaryPath) githubCopilot.binaryPath = binaryPath;
+    const envOverrides = sanitizeEnvOverrides(githubCopilotRaw.envOverrides);
+    if (envOverrides) githubCopilot.envOverrides = envOverrides;
+    if (Object.keys(githubCopilot).length > 0) out["github-copilot"] = githubCopilot;
   }
 
   return Object.keys(out).length > 0 ? out : undefined;

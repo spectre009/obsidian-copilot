@@ -2,9 +2,10 @@
 
 Copilot V4 can get models from a Copilot plan, your own provider key or local
 endpoint, or an agent account you already use. These options are separate.
-Adding a key does not change the models supplied by Claude Code or Codex.
+Adding a key does not change the models supplied by Claude Code, Codex, or
+GitHub Copilot.
 
-Settings show where each source sends your requests. Hover the small icon next to a provider name: a lock for Copilot Plus ("Brevilabs servers (US)"), a desktop for a server on this computer or your local network, and a cloud for any other service. The Claude Code and Codex tabs in Agent settings show the same icon next to the agent name, for example "Amazon Bedrock" when your Claude Code settings turn on Bedrock.
+Settings show where each source sends your requests. Hover the small icon next to a provider name: a lock for Copilot Plus ("Brevilabs servers (US)"), a desktop for a server on this computer or your local network, and a cloud for any other service. The Claude Code, Codex, and GitHub Copilot tabs in Agent settings show the same icon next to the agent name, for example "Amazon Bedrock" when your Claude Code settings turn on Bedrock.
 
 ## Choose a model source
 
@@ -15,6 +16,7 @@ Settings show where each source sends your requests. Hover the small icon next t
 | **Models reported by opencode**     | No         | opencode                                   |
 | **Claude Code account**             | No         | Claude                                     |
 | **Codex account**                   | No         | Codex                                      |
+| **GitHub Copilot plan**             | No         | GitHub Copilot                             |
 
 Models reported by opencode are routed to their backing provider. Free
 opencode Zen models show a warning because that provider may log or train on
@@ -104,19 +106,24 @@ and turn on **Enable CORS**. Responses then appear after completion instead of
 streaming token by token. For LM Studio, you can enable CORS in LM Studio to
 keep streaming instead.
 
-## Claude Code and Codex accounts
+## Claude Code, Codex, and GitHub Copilot accounts
 
-Claude and Codex are Agent Chat backends, not BYOK providers:
+Claude, Codex, and GitHub Copilot are Agent Chat backends, not BYOK providers:
 
 - **Claude** inherits authentication and models from the Claude Code CLI. Its
   usage follows your Claude Code account or CLI environment.
 - **Codex** inherits authentication and models from the Codex CLI through the
   Codex ACP adapter. Its usage follows your OpenAI account or ChatGPT plan.
+- **GitHub Copilot** inherits authentication and models from the GitHub
+  Copilot CLI's `copilot login`. Its usage counts against your GitHub Copilot
+  plan's premium requests. Copilot ignores CLI settings that would send
+  requests elsewhere, such as `COPILOT_PROVIDER_BASE_URL` or tokens in the
+  environment, so this agent always uses your GitHub sign-in.
 
 Copilot discovers the models reported by each agent and lets you enable them
-under **Basic → Agents → Claude** or **Basic → Agents → Codex**. Those models
-stay inside their respective agents; they do not become Quick Chat or opencode
-models.
+under **Basic → Agents → Claude**, **Codex**, or **GitHub Copilot**. Those
+models stay inside their respective agents; they do not become Quick Chat or
+opencode models.
 
 An OpenAI API key is different from a ChatGPT subscription, just as an
 Anthropic API key is different from a Claude Code subscription. Use **BYOK** for

@@ -1,22 +1,27 @@
 import type { CopilotSettings } from "@/settings/model";
 import { ClaudeBackendDescriptor } from "./claude/descriptor";
 import { CodexBackendDescriptor } from "./codex/descriptor";
+import { GitHubCopilotBackendDescriptor } from "./github-copilot/descriptor";
 import { OpencodeBackendDescriptor } from "./opencode/descriptor";
 import type { BackendDescriptor, BackendId } from "@/agentMode/session/types";
 
 export const backendRegistry: Record<BackendId, BackendDescriptor> = {
+  "github-copilot": GitHubCopilotBackendDescriptor,
   opencode: OpencodeBackendDescriptor,
   claude: ClaudeBackendDescriptor,
   codex: CodexBackendDescriptor,
 };
 
-export const RECOMMENDED_BACKEND_ID: BackendId = "opencode";
+// GitHub Copilot needs no vendor service or API key, so it leads for fresh installs.
+// https://github.com/spectre009/obsidian-copilot/issues/2
+export const RECOMMENDED_BACKEND_ID: BackendId = GitHubCopilotBackendDescriptor.id;
 
 let displayOrderCache: BackendDescriptor[] | null = null;
 
 export function backendDisplayOrder(): BackendDescriptor[] {
   if (!displayOrderCache) {
     displayOrderCache = [
+      GitHubCopilotBackendDescriptor,
       OpencodeBackendDescriptor,
       ClaudeBackendDescriptor,
       CodexBackendDescriptor,
@@ -33,8 +38,8 @@ export function backendNeedsSelfHostWarning(
 }
 
 export function getActiveBackendDescriptor(settings: CopilotSettings): BackendDescriptor {
-  const id = settings.agentMode?.activeBackend ?? "opencode";
-  return backendRegistry[id] ?? OpencodeBackendDescriptor;
+  const id = settings.agentMode?.activeBackend ?? RECOMMENDED_BACKEND_ID;
+  return backendRegistry[id] ?? GitHubCopilotBackendDescriptor;
 }
 
 export function listBackendDescriptors(): BackendDescriptor[] {

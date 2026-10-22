@@ -123,7 +123,7 @@ describe("model", () => {
       });
       expect(sanitized.agentMode).toEqual({
         byok: {},
-        activeBackend: "opencode",
+        activeBackend: "github-copilot",
         backends: {},
         debugFullFrames: true,
         offerFeedbackCards: true,
@@ -242,6 +242,54 @@ describe("model", () => {
         agentMode: { enabled: true, byok: {} },
       } as unknown as CopilotSettings);
       expect(sanitized.agentMode.backends).toEqual({});
+    });
+
+    it("starts an install that never chose a backend on GitHub Copilot (https://github.com/spectre009/obsidian-copilot/issues/2)", () => {
+      const sanitized = sanitizeSettings({
+        ...DEFAULT_SETTINGS,
+        agentMode: { byok: {}, backends: {} },
+      } as unknown as CopilotSettings);
+
+      expect(DEFAULT_SETTINGS.agentMode.activeBackend).toBe("github-copilot");
+      expect(sanitized.agentMode.activeBackend).toBe("github-copilot");
+    });
+
+    it.each(["opencode", "claude", "codex", "a-backend-from-a-newer-release"])(
+      "keeps an existing activeBackend of %s, leaving unknown ids to the registry's fallback (https://github.com/spectre009/obsidian-copilot/issues/2)",
+      (activeBackend) => {
+        const sanitized = sanitizeSettings({
+          ...DEFAULT_SETTINGS,
+          agentMode: { byok: {}, activeBackend, backends: {} },
+        } as unknown as CopilotSettings);
+
+        expect(sanitized.agentMode.activeBackend).toBe(activeBackend);
+      }
+    );
+
+    it("keeps a GitHub Copilot slice and drops its malformed fields (https://github.com/spectre009/obsidian-copilot/issues/2)", () => {
+      const sanitized = sanitizeSettings({
+        ...DEFAULT_SETTINGS,
+        agentMode: {
+          byok: {},
+          activeBackend: "github-copilot",
+          backends: {
+            "github-copilot": {
+              binaryPath: "C:\\cli\\copilot.exe",
+              defaultModel: { baseModelId: "claude-sonnet-5.5", effort: "low" },
+              defaultMode: "plan-or-something",
+              envOverrides: { HTTPS_PROXY: "http://proxy:8080", "bad key": "x" },
+              unexpected: true,
+            },
+          },
+        },
+      } as unknown as CopilotSettings);
+
+      expect(sanitized.agentMode.backends["github-copilot"]).toEqual({
+        binaryPath: "C:\\cli\\copilot.exe",
+        defaultModel: { baseModelId: "claude-sonnet-5.5", effort: "low" },
+        defaultMode: undefined,
+        envOverrides: { HTTPS_PROXY: "http://proxy:8080" },
+      });
     });
 
     it("preserves an already-migrated backends.opencode slice", () => {
@@ -750,6 +798,11 @@ describe("model", () => {
               claudeCliPath: "/a/claude",
               opencode: { binaryPath: "/a/oc", binaryVersion: "1", binarySource: "custom" },
               codex: { envOverrides: { GOOD: "1", "bad-key": "x" } },
+              "github-copilot": {
+                binaryPath: "/a/copilot",
+                envOverrides: { GH_HOST: "example.ghe.com", "bad key": "x" },
+                defaultModel: { baseModelId: "synced-elsewhere" },
+              },
             },
             "device-b": {},
             "": { claudeCliPath: "/x" },
@@ -763,6 +816,10 @@ describe("model", () => {
       expect(profiles["device-a"]?.claudeCliPath).toBe("/a/claude");
       expect(profiles["device-a"]?.opencode?.binarySource).toBe("custom");
       expect(profiles["device-a"]?.codex?.envOverrides).toEqual({ GOOD: "1" });
+      expect(profiles["device-a"]?.["github-copilot"]).toEqual({
+        binaryPath: "/a/copilot",
+        envOverrides: { GH_HOST: "example.ghe.com" },
+      });
       expect(profiles["device-b"]).toBeUndefined();
       expect(profiles[""]).toBeUndefined();
     });
