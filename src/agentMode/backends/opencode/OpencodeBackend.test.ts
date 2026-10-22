@@ -30,10 +30,14 @@ import {
 } from "./OpencodeBackend";
 import { buildAgentSystemPrompt } from "@/agentMode/backends/shared/agentSystemPrompt";
 import {
+  PLUS_ENV,
   SELF_HOST_WEB_SEARCH_ENV,
   SELF_HOST_WEB_SEARCH_TOKEN_ENV,
   SELF_HOST_WEB_SEARCH_URL_ENV,
 } from "@/builtinSkills/builtinSkills";
+import { VendorServicesBlockedError } from "@/vendorServices/vendorServicesPolicy";
+
+const BLOCK_ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/1";
 
 function resetPromptState(): void {
   setDisableBuiltinSystemPrompt(false);
@@ -219,8 +223,26 @@ describe("OpencodeBackend", () => {
 
     beforeEach(() => {
       resetSettings();
+      setSettings({ blockVendorServices: false });
       seedSkills([]);
       resetPromptState();
+    });
+
+    it(`${BLOCK_ISSUE} leaves the Copilot Plus provider out of the config while vendor services are blocked, keeping BYOK providers`, async () => {
+      setSettings({ blockVendorServices: true });
+      const byok = makeProvider("p-anthropic", { kind: "byok", catalogProviderId: "anthropic" });
+      const deps = makeDeps({
+        resolved: [
+          okEntry(makePlusProvider(), makeModel("p-plus", "copilot-plus-flash")),
+          okEntry(byok, makeModel("p-anthropic", "claude-sonnet-4-6")),
+        ],
+        keys: { "p-plus": "plus-token-123", "p-anthropic": "anth-123" },
+      });
+
+      const cfg = await buildOpencodeConfig(getSettings(), deps);
+
+      expect(Object.keys(cfg.providers)).toEqual(["anthropic"]);
+      expect(JSON.stringify(cfg)).not.toContain("brevilabs");
     });
 
     it("https://github.com/Brevilabs/obsidian-copilot-private/issues/557 registers a BYOK provider in OpenCode 2 config with its keychain key and model", async () => {
@@ -955,8 +977,84 @@ describe("OpencodeBackend", () => {
     describe("buildSpawnDescriptor()", () => {
       beforeEach(() => {
         resetSettings();
+        setSettings({ blockVendorServices: false });
         seedSkills([]);
         resetPromptState();
+      });
+
+      it(`${BLOCK_ISSUE} removes inherited, managed, and override vendor variables from the spawn env while vendor services are blocked`, async () => {
+        const inheritedKey = PLUS_ENV.licenseKey;
+        const previous = process.env[inheritedKey];
+        process.env[inheritedKey] = "inherited-license";
+        try {
+          setSettings({
+            blockVendorServices: true,
+            isPaidUser: true,
+            plusLicenseKey: "plus-token",
+            userId: "user-1",
+          });
+          setOpencodeSettings({
+            binaryPath: "/path/to/opencode",
+            envOverrides: { [PLUS_ENV.baseUrl]: "https://api.brevilabs.com/v1", KEEP_ME: "yes" },
+          });
+
+          const desc = await new OpencodeBackend({
+            ...NO_MODELS_DEPS,
+            clientVersion: "4.0.15",
+          }).buildSpawnDescriptor({ vaultBasePath: "/vault" });
+
+          for (const key of Object.values(PLUS_ENV)) {
+            expect(desc.env).not.toHaveProperty(key);
+          }
+          expect(desc.env.KEEP_ME).toBe("yes");
+        } finally {
+          if (previous === undefined) delete process.env[inheritedKey];
+          else process.env[inheritedKey] = previous;
+        }
+      });
+
+      it(`${BLOCK_ISSUE} rejects an OPENCODE_CONFIG_CONTENT override that names a vendor host while vendor services are blocked`, async () => {
+        setSettings({ blockVendorServices: true });
+        setOpencodeSettings({
+          binaryPath: "/path/to/opencode",
+          envOverrides: {
+            OPENCODE_CONFIG_CONTENT: JSON.stringify({
+              providers: { x: { settings: { baseURL: "https://models.brevilabs.com/v1" } } },
+            }),
+          },
+        });
+
+        await expect(
+          new OpencodeBackend(NO_MODELS_DEPS).buildSpawnDescriptor({ vaultBasePath: "/vault" })
+        ).rejects.toThrow("names a vendor service host");
+      });
+
+      it("accepts an OPENCODE_CONFIG_CONTENT override that names a vendor host while vendor services are allowed", async () => {
+        const override = JSON.stringify({
+          providers: { x: { settings: { baseURL: "https://models.brevilabs.com/v1" } } },
+        });
+        setOpencodeSettings({
+          binaryPath: "/path/to/opencode",
+          envOverrides: { OPENCODE_CONFIG_CONTENT: override },
+        });
+
+        const desc = await new OpencodeBackend(NO_MODELS_DEPS).buildSpawnDescriptor({
+          vaultBasePath: "/vault",
+        });
+
+        expect(desc.env.OPENCODE_CONFIG_CONTENT).toBe(override);
+      });
+
+      it(`${BLOCK_ISSUE} refuses to spawn with a config built before blocking turned on mid-preparation`, async () => {
+        setOpencodeSettings({ binaryPath: "/path/to/opencode" });
+        jest.mocked(verifyOpencodeBinary).mockImplementationOnce(async () => {
+          setSettings({ blockVendorServices: true });
+          return { stdout: "2.0.21" };
+        });
+
+        await expect(
+          new OpencodeBackend(NO_MODELS_DEPS).buildSpawnDescriptor({ vaultBasePath: "/vault" })
+        ).rejects.toBeInstanceOf(VendorServicesBlockedError);
       });
 
       it("https://github.com/Brevilabs/obsidian-copilot-private/issues/569 rejects a V1 executable even when settings claim a supported V2 version", async () => {

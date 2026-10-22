@@ -6,6 +6,7 @@ import {
   builtinSkillUnavailableReason,
   DEFAULT_BUILTIN_PREFERENCES,
   isBuiltinSkillEnabledFor,
+  VENDOR_SKILL_BLOCKED_REASON,
   PLUS_ENV,
   SELF_HOST_WEB_SEARCH_ENV,
   SELF_HOST_WEB_SEARCH_TOKEN_ENV,
@@ -42,6 +43,7 @@ function settingsWith(
 ): CopilotSettings {
   return {
     ...DEFAULT_SETTINGS,
+    blockVendorServices: false,
     ...overrides,
     agentMode: {
       ...DEFAULT_SETTINGS.agentMode,
@@ -421,20 +423,42 @@ describe("builtinSkills", () => {
   });
 
   describe("builtinSkillUnavailableReason()", () => {
+    const ALLOWED = { blockVendorServices: false };
+    const BLOCKED = { blockVendorServices: true };
+    const VENDOR_SKILLS = [
+      "copilot-web-search",
+      "copilot-web-fetch",
+      "copilot-youtube-transcript",
+      "copilot-fetch-x",
+      "openartifacts-publish",
+    ];
+
     it("leaves every skill available while Obsidian's command line interface is on", () => {
       mockIsObsidianCliEnabled.mockReturnValue(true);
       for (const skill of BUILTIN_SKILLS) {
-        expect(builtinSkillUnavailableReason(skill.name)).toBeUndefined();
+        expect(builtinSkillUnavailableReason(skill.name, ALLOWED)).toBeUndefined();
       }
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 marks exactly the five vendor skills unavailable, naming the setting, while vendor services are blocked", () => {
+      mockIsObsidianCliEnabled.mockReturnValue(true);
+      const unavailable = BUILTIN_SKILLS.filter((skill) =>
+        builtinSkillUnavailableReason(skill.name, BLOCKED)
+      ).map((skill) => skill.name);
+
+      expect(unavailable).toEqual(VENDOR_SKILLS);
+      expect(builtinSkillUnavailableReason("copilot-fetch-x", BLOCKED)).toBe(
+        VENDOR_SKILL_BLOCKED_REASON
+      );
     });
 
     it("makes only obsidian-cli unavailable, naming the Obsidian setting, while the command line interface is off (https://github.com/Brevilabs/obsidian-copilot-private/issues/726)", () => {
       mockIsObsidianCliEnabled.mockReturnValue(false);
-      expect(builtinSkillUnavailableReason("obsidian-cli")).toBe(
+      expect(builtinSkillUnavailableReason("obsidian-cli", ALLOWED)).toBe(
         "Turn on Command line interface in Obsidian's Settings → General to use this skill."
       );
       for (const skill of BUILTIN_SKILLS.filter((skill) => skill.name !== "obsidian-cli")) {
-        expect(builtinSkillUnavailableReason(skill.name)).toBeUndefined();
+        expect(builtinSkillUnavailableReason(skill.name, ALLOWED)).toBeUndefined();
       }
       mockIsObsidianCliEnabled.mockReturnValue(true);
     });
@@ -448,13 +472,29 @@ describe("builtinSkills", () => {
       }
     });
 
-    it("keeps default-off skills off for every agent in a fresh install https://github.com/Brevilabs/obsidian-copilot-private/issues/629", () => {
+    it("keeps default-off skills off for every agent in a fresh install that allows vendor services https://github.com/Brevilabs/obsidian-copilot-private/issues/629", () => {
+      const fresh = { ...DEFAULT_SETTINGS, blockVendorServices: false };
       for (const agent of ["claude", "codex", "opencode"]) {
         for (const name of ["copilot-web-search", "copilot-web-fetch"]) {
+          expect(isBuiltinSkillEnabledFor(fresh, name, agent)).toBe(false);
+        }
+        expect(isBuiltinSkillEnabledFor(fresh, "copilot-fetch-x", agent)).toBe(true);
+      }
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 enables no vendor skill for any agent in a fresh install, which blocks vendor services, while Obsidian skills stay on", () => {
+      for (const agent of ["claude", "codex", "opencode"]) {
+        for (const name of [
+          "copilot-youtube-transcript",
+          "copilot-fetch-x",
+          "openartifacts-publish",
+        ]) {
           expect(isBuiltinSkillEnabledFor(DEFAULT_SETTINGS, name, agent)).toBe(false);
         }
-        expect(isBuiltinSkillEnabledFor(DEFAULT_SETTINGS, "copilot-fetch-x", agent)).toBe(true);
       }
+      expect(isBuiltinSkillEnabledFor(DEFAULT_SETTINGS, "obsidian-markdown", "opencode")).toBe(
+        true
+      );
     });
 
     it("disables a skill only for the agents the user opted out", () => {

@@ -23,6 +23,14 @@ import { CopilotPlusUsageReader } from "@/agentMode/backends/shared/copilotPlusU
 import type { SelfHostWebSearchAgentChannel } from "@/LLMProviders/selfHostServices";
 import type { Config } from "@opencode/schema/config";
 import { installOpencodeCopilotPlugin } from "./opencodeCopilotPlugin";
+import {
+  areVendorServicesBlocked,
+  isVendorProvider,
+  namesVendorHost,
+  VENDOR_SERVICES_BLOCKED_MESSAGE,
+  VendorServicesBlockedError,
+  withoutVendorEnv,
+} from "@/vendorServices/vendorServicesPolicy";
 
 export const OPENCODE_PROVIDER_MAP: Partial<Record<ChatModelProviders, string>> = {
   [ChatModelProviders.ANTHROPIC]: "anthropic",
@@ -103,6 +111,17 @@ export class OpencodeBackend implements AcpBackend {
     );
     const configOverride = envOverrides.OPENCODE_CONFIG_CONTENT;
     delete envOverrides.OPENCODE_CONFIG_CONTENT;
+    // A hand-written config bypasses the generated one, so it must not route to a vendor host either.
+    // https://github.com/spectre009/obsidian-copilot/issues/1
+    if (
+      configOverride !== undefined &&
+      areVendorServicesBlocked(settings) &&
+      namesVendorHost(configOverride)
+    ) {
+      throw new Error(
+        `opencode OPENCODE_CONFIG_CONTENT names a vendor service host. ${VENDOR_SERVICES_BLOCKED_MESSAGE}`
+      );
+    }
     let configContent =
       configOverride ??
       JSON.stringify(
@@ -153,6 +172,12 @@ export class OpencodeBackend implements AcpBackend {
       ctx.vaultBasePath,
       selfHostSearchChannel
     );
+    // The config above was built from the settings read before these awaits; a block that landed
+    // since must not spawn with it. https://github.com/spectre009/obsidian-copilot/issues/1
+    const spawnSettings = getSettings();
+    if (areVendorServicesBlocked(spawnSettings) && !areVendorServicesBlocked(settings)) {
+      throw new VendorServicesBlockedError();
+    }
 
     return {
       command: binaryPath,
@@ -162,16 +187,19 @@ export class OpencodeBackend implements AcpBackend {
       // OpenCode uses the process directory for project discovery; its ACP
       // command has no --cwd flag. https://github.com/Brevilabs/obsidian-copilot-private/issues/555
       cwd: ctx.vaultBasePath,
-      env: {
-        ...process.env,
-        ...builtinSkillEnv,
-        // OpenCode's level filters its file log and stderr together, and its
-        // server logs request-failure causes at INFO, so WARN hid every cause.
-        // https://github.com/Brevilabs/obsidian-copilot-private/issues/650
-        OPENCODE_LOG_LEVEL: "INFO",
-        ...envOverrides,
-        OPENCODE_CONFIG_CONTENT: configContent,
-      },
+      env: withoutVendorEnv(
+        {
+          ...process.env,
+          ...builtinSkillEnv,
+          // OpenCode's level filters its file log and stderr together, and its
+          // server logs request-failure causes at INFO, so WARN hid every cause.
+          // https://github.com/Brevilabs/obsidian-copilot-private/issues/650
+          OPENCODE_LOG_LEVEL: "INFO",
+          ...envOverrides,
+          OPENCODE_CONFIG_CONTENT: configContent,
+        },
+        spawnSettings
+      ),
     };
   }
 }
@@ -218,8 +246,12 @@ export async function buildOpencodeConfig(
   const modelsByProvider: Record<string, Record<string, ModelConfig>> = {};
   const injected: string[] = [];
 
+  const vendorBlocked = areVendorServicesBlocked(s);
   for (const entry of backendConfigRegistry.resolveEnabled("opencode")) {
     if (entry.state !== "ok") continue;
+    // Hosted Plus models send the whole agent context to the vendor, so a blocked install never
+    // hands opencode their provider. https://github.com/spectre009/obsidian-copilot/issues/1
+    if (vendorBlocked && isVendorProvider(entry.provider)) continue;
     const mapping = mapProviderToOpencodeId(entry.provider);
     if (!mapping) continue;
     if (mapping.native) continue;

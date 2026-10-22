@@ -13,6 +13,7 @@ import {
 import RESEARCH_MEMO_THEME from "openartifacts/skill/openartifacts/themes/research-memo.md";
 import { createProductUrl, PRODUCT_URLS } from "@/lib/productLinks";
 import { isObsidianCliEnabled } from "@/services/obsidianCli/ObsidianCliClient";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
 import { OBSIDIAN_SKILLS } from "./obsidianSkills";
 import { howToRunSection, SHELL_TOOL_SENTENCE } from "./howToRunSection";
 
@@ -1059,9 +1060,33 @@ export const DEFAULT_BUILTIN_PREFERENCES: BuiltinPreferences = Object.freeze(
   )
 );
 
+// These skills reach vendor relays or OpenArtifacts, so a blocked install offers none of them.
+// https://github.com/spectre009/obsidian-copilot/issues/1
+const VENDOR_BUILTIN_SKILL_NAMES: ReadonlySet<string> = new Set([
+  WEB_SEARCH.name,
+  WEB_FETCH.name,
+  YOUTUBE_TRANSCRIPT.name,
+  FETCH_X.name,
+  OPENARTIFACTS_PUBLISH.name,
+]);
+
+export const VENDOR_SKILL_BLOCKED_REASON =
+  "Blocked by the Block vendor services setting in Settings → Basic.";
+
+function isBlockedVendorSkill(
+  skillName: string,
+  settings: Pick<CopilotSettings, "blockVendorServices">
+): boolean {
+  return VENDOR_BUILTIN_SKILL_NAMES.has(skillName) && areVendorServicesBlocked(settings);
+}
+
 // The CLI toggle is per device, so an unavailable skill keeps its synced files and loses only its
 // agent links and steering here. https://github.com/Brevilabs/obsidian-copilot-private/issues/726
-export function builtinSkillUnavailableReason(skillName: string): string | undefined {
+export function builtinSkillUnavailableReason(
+  skillName: string,
+  settings: Pick<CopilotSettings, "blockVendorServices">
+): string | undefined {
+  if (isBlockedVendorSkill(skillName, settings)) return VENDOR_SKILL_BLOCKED_REASON;
   return skillName === "obsidian-cli" && !isObsidianCliEnabled()
     ? "Turn on Command line interface in Obsidian's Settings → General to use this skill."
     : undefined;
@@ -1072,6 +1097,7 @@ export function isBuiltinSkillEnabledFor(
   skillName: string,
   agentId: string
 ): boolean {
+  if (isBlockedVendorSkill(skillName, settings)) return false;
   const pref = settings.agentMode.skills.builtinPreferences?.[skillName];
   if (pref?.disabled || pref?.disabledAgents?.includes(agentId)) return false;
   return BUILTIN_SKILLS.some((skill) => skill.name === skillName);

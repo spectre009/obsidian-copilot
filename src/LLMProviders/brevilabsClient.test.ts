@@ -16,6 +16,7 @@ jest.mock("@/plusUtils", () => ({
 
 import { BrevilabsClient } from "@/LLMProviders/brevilabsClient";
 import { BREVILABS_MODELS_BASE_URL } from "@/constants";
+import { VendorServicesBlockedError } from "@/vendorServices/vendorServicesPolicy";
 
 import * as obsidianModule from "obsidian";
 
@@ -47,6 +48,9 @@ function licenseRejection(keyPrefix: string): RequestOutcome {
 
 const VALID_LICENSE_RESPONSE = { entitlement: "signed-token", plan: "supporter" };
 const MANUAL_LICENSE_CHECK = { trigger: "manual" } as const;
+const ALLOWED = { blockVendorServices: false } as const;
+const BLOCKED = { blockVendorServices: true } as const;
+const ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/1";
 
 describe("brevilabsClient", () => {
   describe("BrevilabsClient", () => {
@@ -67,7 +71,7 @@ describe("brevilabsClient", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors how stubRequest reaches it
         delete (BrevilabsClient.getInstance() as any).makeRequest;
         mockApplyEntitlement.mockResolvedValue(true);
-        mockGetSettings.mockReturnValue({ plusLicenseKey: "key-A", userId: "user-1" });
+        mockGetSettings.mockReturnValue({ ...ALLOWED, plusLicenseKey: "key-A", userId: "user-1" });
       });
 
       it("revokes entitlement for the 403 body the license endpoint actually returns", async () => {
@@ -95,7 +99,7 @@ describe("brevilabsClient", () => {
       });
 
       it("answers invalid without a request when no license key is stored (https://github.com/Brevilabs/obsidian-copilot-private/issues/307)", async () => {
-        mockGetSettings.mockReturnValue({ plusLicenseKey: "" });
+        mockGetSettings.mockReturnValue({ ...ALLOWED, plusLicenseKey: "" });
         const makeRequest = jest.fn();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- verifies the private HTTP boundary
         (BrevilabsClient.getInstance() as any).makeRequest = makeRequest;
@@ -206,7 +210,7 @@ describe("brevilabsClient", () => {
 
       it("discards a success that arrives after the license key changed", async () => {
         stubRequest({ data: VALID_LICENSE_RESPONSE, error: null }, () => {
-          mockGetSettings.mockReturnValue({ plusLicenseKey: "key-B" });
+          mockGetSettings.mockReturnValue({ ...ALLOWED, plusLicenseKey: "key-B" });
         });
 
         const result = await BrevilabsClient.getInstance().validateLicenseKey(
@@ -221,7 +225,7 @@ describe("brevilabsClient", () => {
 
       it("discards a rejection that arrives after the license key changed", async () => {
         stubRequest(licenseRejection("key-A-gar"), () => {
-          mockGetSettings.mockReturnValue({ plusLicenseKey: "key-B" });
+          mockGetSettings.mockReturnValue({ ...ALLOWED, plusLicenseKey: "key-B" });
         });
 
         const result = await BrevilabsClient.getInstance().validateLicenseKey(
@@ -232,13 +236,85 @@ describe("brevilabsClient", () => {
         expect(result).toEqual({ isValid: undefined });
         expect(mockTurnOffPaid).not.toHaveBeenCalled();
       });
+
+      it(`sends no license request and rejects with VendorServicesBlockedError while vendor services are blocked — ${ISSUE}`, async () => {
+        mockGetSettings.mockReturnValue({ ...BLOCKED, plusLicenseKey: "key-A", userId: "user-1" });
+        const requestUrl = jest.fn();
+        setRequestUrlImpl(requestUrl);
+
+        await expect(
+          BrevilabsClient.getInstance().validateLicenseKey(undefined, MANUAL_LICENSE_CHECK)
+        ).rejects.toBeInstanceOf(VendorServicesBlockedError);
+        expect(requestUrl).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ["a success", { data: VALID_LICENSE_RESPONSE, error: null }],
+        ["a 403 rejection", licenseRejection("key-A-gar")],
+      ])(
+        `discards %s that arrives after vendor services were blocked, leaving paid state untouched — ${ISSUE}`,
+        async (_label, outcome) => {
+          stubRequest(outcome, () => {
+            mockGetSettings.mockReturnValue({ ...BLOCKED, plusLicenseKey: "key-A" });
+          });
+
+          const result = await BrevilabsClient.getInstance().validateLicenseKey(
+            undefined,
+            MANUAL_LICENSE_CHECK
+          );
+
+          expect(result).toEqual({ isValid: undefined });
+          expect(mockApplyEntitlement).not.toHaveBeenCalled();
+          expect(mockMarkPaidPendingEntitlement).not.toHaveBeenCalled();
+          expect(mockTurnOffPaid).not.toHaveBeenCalled();
+        }
+      );
+    });
+
+    describe.each([
+      ["webSearch()", (client: BrevilabsClient) => client.webSearch("query")],
+      ["url4llm()", (client: BrevilabsClient) => client.url4llm("https://example.test")],
+      ["youtube4llm()", (client: BrevilabsClient) => client.youtube4llm("https://youtu.be/x")],
+      ["twitter4llm()", (client: BrevilabsClient) => client.twitter4llm("https://x.com/a/1")],
+      ["rerank()", (client: BrevilabsClient) => client.rerank("query", ["doc"])],
+    ])("%s", (_name, call) => {
+      const requestUrlMock = jest.fn();
+      beforeEach(() => {
+        jest.clearAllMocks();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- exercise the real private transport
+        delete (BrevilabsClient.getInstance() as any).makeRequest;
+        setRequestUrlImpl(requestUrlMock);
+      });
+
+      it("posts to the vendor relay with the license key while vendor services are allowed", async () => {
+        mockGetSettings.mockReturnValue({ ...ALLOWED, plusLicenseKey: "key-A", userId: "user-1" });
+        requestUrlMock.mockResolvedValue({ status: 200, json: { response: "ok" } });
+
+        await call(BrevilabsClient.getInstance());
+
+        const request = requestUrlMock.mock.calls[0][0] as {
+          url: string;
+          headers: Record<string, string>;
+        };
+        expect(request.url.startsWith("https://api.brevilabs.com/v1/")).toBe(true);
+        expect(request.headers.Authorization).toBe("Bearer key-A");
+      });
+
+      it(`sends nothing and rejects with VendorServicesBlockedError while vendor services are blocked — ${ISSUE}`, async () => {
+        mockGetSettings.mockReturnValue({ ...BLOCKED, plusLicenseKey: "key-A", userId: "user-1" });
+
+        await expect(call(BrevilabsClient.getInstance())).rejects.toBeInstanceOf(
+          VendorServicesBlockedError
+        );
+        expect(requestUrlMock).not.toHaveBeenCalled();
+      });
     });
 
     describe("getUsage()", () => {
       const requestUrlMock = jest.fn();
       beforeEach(() => {
         jest.clearAllMocks();
-        mockGetSettings.mockReturnValue({ plusLicenseKey: "key-A" });
+        mockGetSettings.mockReturnValue({ ...ALLOWED, plusLicenseKey: "key-A" });
         setRequestUrlImpl(requestUrlMock);
       });
 
@@ -262,7 +338,7 @@ describe("brevilabsClient", () => {
       });
 
       it("answers null without a request when there is no license key", async () => {
-        mockGetSettings.mockReturnValue({ plusLicenseKey: "" });
+        mockGetSettings.mockReturnValue({ ...ALLOWED, plusLicenseKey: "" });
 
         await expect(BrevilabsClient.getInstance().getUsage()).resolves.toBeNull();
         expect(requestUrlMock).not.toHaveBeenCalled();
@@ -276,12 +352,20 @@ describe("brevilabsClient", () => {
 
         await expect(BrevilabsClient.getInstance().getUsage()).resolves.toBeNull();
       });
+
+      it(`answers null without a request while vendor services are blocked — ${ISSUE}`, async () => {
+        mockGetSettings.mockReturnValue({ ...BLOCKED, plusLicenseKey: "key-A" });
+
+        await expect(BrevilabsClient.getInstance().getUsage()).resolves.toBeNull();
+        expect(requestUrlMock).not.toHaveBeenCalled();
+      });
     });
 
     describe("getModels()", () => {
       const requestUrlMock = jest.fn();
       beforeEach(() => {
         jest.clearAllMocks();
+        mockGetSettings.mockReturnValue({ ...ALLOWED });
         setRequestUrlImpl(requestUrlMock);
       });
 
@@ -306,6 +390,13 @@ describe("brevilabsClient", () => {
         arrange();
 
         await expect(BrevilabsClient.getInstance().getModels()).resolves.toBeNull();
+      });
+
+      it(`answers null without fetching the public catalog while vendor services are blocked — ${ISSUE}`, async () => {
+        mockGetSettings.mockReturnValue({ ...BLOCKED });
+
+        await expect(BrevilabsClient.getInstance().getModels()).resolves.toBeNull();
+        expect(requestUrlMock).not.toHaveBeenCalled();
       });
     });
   });

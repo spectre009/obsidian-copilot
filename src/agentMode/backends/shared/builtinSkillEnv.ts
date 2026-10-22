@@ -14,6 +14,10 @@ import {
 } from "@/agentMode/backends/shared/obsidianCliPath";
 import { requireNodeModule } from "@/utils/desktopRuntime";
 import type { BackendId } from "@/agentMode/session/types";
+import {
+  areVendorServicesBlocked,
+  vendorServicesTransition,
+} from "@/vendorServices/vendorServicesPolicy";
 
 const MIYO_URL_ENV = "MIYO_URL";
 
@@ -55,7 +59,7 @@ export async function buildBuiltinSkillEnv(
   const miyoUrl = getMiyoCustomUrl(settings);
   if (miyoUrl) env[MIYO_URL_ENV] = miyoUrl;
 
-  if (settings.isPaidUser && settings.plusLicenseKey) {
+  if (settings.isPaidUser && settings.plusLicenseKey && !areVendorServicesBlocked(settings)) {
     env[PLUS_ENV.licenseKey] = settings.plusLicenseKey;
     env[PLUS_ENV.baseUrl] = BREVILABS_API_BASE_URL;
     env[PLUS_ENV.userId] = settings.userId ?? "";
@@ -80,7 +84,12 @@ export function getBuiltinSkillEnvRestartPolicy(
   next: CopilotSettings,
   backendId: BackendId
 ): "none" | "deferred" | "immediate" {
+  // A running agent keeps the vendor env and config it was spawned with, so blocking cannot wait
+  // for a turn to end or for a Reload. https://github.com/spectre009/obsidian-copilot/issues/1
+  const vendorTransition = vendorServicesTransition(prev, next);
+  if (vendorTransition === "blocked") return "immediate";
   const ordinaryEnvChanged =
+    vendorTransition === "allowed" ||
     prev.isPaidUser !== next.isPaidUser ||
     prev.plusLicenseKey !== next.plusLicenseKey ||
     prev.miyoConnectionMode !== next.miyoConnectionMode ||

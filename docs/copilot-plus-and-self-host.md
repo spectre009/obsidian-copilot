@@ -98,6 +98,23 @@ For a workflow that does not send task content to Brevilabs, use direct Markdown
 
 The [privacy policy](https://www.obsidiancopilot.com/en/privacy) describes how Copilot's hosted requests are processed. Your model provider and Miyo server have their own boundaries and terms.
 
+## Block vendor services
+
+**Settings → Copilot → Basic → Block vendor services** is on by default. While it is on, Copilot makes no connection to Brevilabs or OpenArtifacts and does not check for upstream releases:
+
+- No license checks and no download of the Copilot model list, including at startup.
+- No Copilot-hosted models, in Quick Chat or Agent Chat. A chat that was already using one stops sending to it.
+- No Copilot-hosted web search, page fetch, YouTube, or X tools, and no publishing to OpenArtifacts. The matching built-in Skills are removed from your agents.
+- No report uploads. **Report an issue** still builds the report on your computer so you can attach it yourself.
+- No upgrade pages open automatically, and release notes show no vendor-hosted images.
+- Your license key is not sent to a Miyo server.
+
+Running agents restart as soon as you turn it on, so none keeps a connection it was started with.
+
+Your license key, paid status, and Copilot model settings are kept but unused. Turn the setting off to use Copilot Plus again; Copilot then checks the license and refreshes the model list.
+
+This setting covers Copilot's own services only. Models and services you choose yourself, such as BYOK providers, Claude, Codex, and Miyo, still connect to their own servers. A provider you add by hand that points at a Brevilabs address is blocked too.
+
 ## Self-Host Mode is a guide, not a firewall
 
 Supporter and eligible legacy licenses can open **Settings → Copilot → Self-Host** and enable **Self-Host Mode**.
@@ -118,9 +135,10 @@ You do not need Self-Host Mode to use a local BYOK model or local Miyo. Those ar
 ## Add or change a license
 
 1. Open **Settings → Copilot → Basic**.
-2. Paste your license key under **Copilot License**.
-3. Select **Apply**.
-4. Review the hosted models enabled under **Basic → Agents → opencode** and **Basic → Agents → Quick Chat**.
+2. Turn off **Block vendor services**. The license section is hidden while it is on.
+3. Paste your license key under **Copilot License**.
+4. Select **Apply**.
+5. Review the hosted models enabled under **Basic → Agents → opencode** and **Basic → Agents → Quick Chat**.
 
 Use the [Copilot dashboard](https://www.obsidiancopilot.com/en/dashboard) for current plan, allowance, and credit details. Removing a Copilot license does not remove your BYOK providers or vendor subscriptions.
 

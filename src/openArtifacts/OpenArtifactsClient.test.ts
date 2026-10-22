@@ -1,9 +1,12 @@
 import { OpenArtifactsClient, OpenArtifactsClientError } from "@/openArtifacts/OpenArtifactsClient";
 import { OPENARTIFACTS_API_ORIGIN } from "@/openArtifacts/constants";
 import type { OpenArtifactsDocument } from "@/openArtifacts/types";
+import { setSettings } from "@/settings/model";
+import { VENDOR_SERVICES_BLOCKED_MESSAGE } from "@/vendorServices/vendorServicesPolicy";
 import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from "obsidian";
 
 jest.mock("obsidian", () => ({
+  ...jest.requireActual<typeof import("obsidian")>("obsidian"),
   requestUrl: jest.fn(),
 }));
 
@@ -47,6 +50,7 @@ describe("OpenArtifactsClient", () => {
 
   beforeEach(() => {
     mockedRequestUrl.mockReset();
+    setSettings({ blockVendorServices: false });
   });
 
   describe("OpenArtifactsClientError", () => {
@@ -68,6 +72,18 @@ describe("OpenArtifactsClient", () => {
 
   describe("OpenArtifactsClient", () => {
     describe("publish()", () => {
+      it("https://github.com/spectre009/obsidian-copilot/issues/1 sends nothing and fails with a non-retryable vendor-services error while blocked", async () => {
+        setSettings({ blockVendorServices: true });
+
+        await expectClientError(new OpenArtifactsClient().publish(DOCUMENT, "decrypted-license"), {
+          message: VENDOR_SERVICES_BLOCKED_MESSAGE,
+          code: "vendor_services_blocked",
+          status: null,
+          retryable: false,
+        });
+        expect(mockedRequestUrl).not.toHaveBeenCalled();
+      });
+
       it("posts only title and HTML to the fixed endpoint and returns the server URL verbatim", async () => {
         const returnedUrl = `https://openartifacts.site/d/${DOC_ID}?from=server#exact`;
         mockedRequestUrl.mockResolvedValue(

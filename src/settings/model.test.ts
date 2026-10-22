@@ -409,6 +409,27 @@ describe("model", () => {
       expect(out.enableMiyoDocumentProcessing).toBe(true);
     });
 
+    it("blocks vendor services by default", () => {
+      expect(DEFAULT_SETTINGS.blockVendorServices).toBe(true);
+      expect(sanitizeSettings({ ...DEFAULT_SETTINGS }).blockVendorServices).toBe(true);
+    });
+
+    it.each([undefined, "false", 0, null])(
+      "turns a missing or non-boolean blockVendorServices (%p) into true so an older data.json fails closed — https://github.com/spectre009/obsidian-copilot/issues/1",
+      (blockVendorServices) => {
+        const out = sanitizeSettings({
+          ...DEFAULT_SETTINGS,
+          blockVendorServices,
+        } as unknown as CopilotSettings);
+        expect(out.blockVendorServices).toBe(true);
+      }
+    );
+
+    it("preserves blockVendorServices=false so a user can allow vendor services", () => {
+      const out = sanitizeSettings({ ...DEFAULT_SETTINGS, blockVendorServices: false });
+      expect(out.blockVendorServices).toBe(false);
+    });
+
     it("resets a non-boolean enableMiyoDocumentProcessing to true", () => {
       const out = sanitizeSettings({
         ...DEFAULT_SETTINGS,
@@ -1018,6 +1039,14 @@ describe("model", () => {
   });
 
   describe("resetSettings()", () => {
+    it("turns Block vendor services back on, since resetting restores the fail-closed default — https://github.com/spectre009/obsidian-copilot/issues/1", () => {
+      settingsStore.set(settingsAtom, { ...DEFAULT_SETTINGS, blockVendorServices: false });
+
+      resetSettings();
+
+      expect(settingsStore.get(settingsAtom).blockVendorServices).toBe(true);
+    });
+
     it("preserves historical roots and folds in the pre-reset active root", () => {
       settingsStore.set(settingsAtom, {
         ...DEFAULT_SETTINGS,

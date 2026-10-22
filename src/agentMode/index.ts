@@ -1,4 +1,4 @@
-import { type App, Platform } from "obsidian";
+import { type App, Notice, Platform } from "obsidian";
 import type CopilotPlugin from "@/main";
 import { logError } from "@/logger";
 import { MiyoClient } from "@/miyo/MiyoClient";
@@ -11,6 +11,7 @@ import { isObsidianCliEnabled } from "@/services/obsidianCli/ObsidianCliClient";
 import { requireNodeModule } from "@/utils/desktopRuntime";
 import { buildAgentSystemPrompt } from "./backends/shared/agentSystemPrompt";
 import { getBuiltinSkillEnvRestartPolicy } from "./backends/shared/builtinSkillEnv";
+import { vendorServicesTransition } from "@/vendorServices/vendorServicesPolicy";
 import { backendRegistry, listBackendDescriptors } from "./backends/registry";
 import type { BackendId } from "./session/types";
 import { AgentChatPersistenceManager } from "./session/AgentChatPersistenceManager";
@@ -38,6 +39,7 @@ import {
 } from "@/miyo/miyoParseTool";
 import { getVaultBase } from "@/utils/vaultPath";
 import { SkillManager } from "./skills";
+import type { RefreshResult } from "./skills/SkillManager";
 import {
   availableBuiltinAgents,
   reconcileBuiltinSkills,
@@ -311,9 +313,9 @@ export function createAgentSessionManager(app: App, plugin: CopilotPlugin): Agen
         );
     }
   });
-  const seedManagedBuiltins = async (): Promise<void> => {
+  const seedManagedBuiltins = async (): Promise<RefreshResult> => {
     seededWithCli = isObsidianCliEnabled();
-    await skillManager.refresh(true);
+    return skillManager.refresh(true);
   };
   subscribeToSettingsChange((prev, next) => {
     for (const descriptor of listBackendDescriptors()) {
@@ -340,13 +342,24 @@ export function createAgentSessionManager(app: App, plugin: CopilotPlugin): Agen
       prev.miyoConnectionMode !== next.miyoConnectionMode ||
       prev.miyoServerUrl !== next.miyoServerUrl ||
       prev.isPaidUser !== next.isPaidUser;
+    const vendorTransition = vendorServicesTransition(prev, next);
     if (
       prevFolder !== nextFolder ||
       miyoAvailabilityChanged ||
+      vendorTransition !== null ||
       prev.agentMode.skills.builtinPreferences !== next.agentMode.skills.builtinPreferences
     ) {
       void seedManagedBuiltins()
-        .then(refreshSystemPromptAffected)
+        .then((result) => {
+          // Vendor skills left on disk stay linked to agents, so a failed removal is surfaced.
+          // https://github.com/spectre009/obsidian-copilot/issues/1
+          if (vendorTransition === "blocked" && (!result.ok || result.reconcileErrorCount > 0)) {
+            const detail = result.reconcileError ?? result.discoveryError ?? "unknown error";
+            logError("[Skills] vendor skill removal after blocking failed", detail);
+            new Notice(`Copilot could not remove every vendor skill: ${detail}`);
+          }
+          refreshSystemPromptAffected();
+        })
         .catch((e) => logError("[Skills] builtin skill re-seeding failed", e));
     }
   });
@@ -363,9 +376,12 @@ export function createAgentSessionManager(app: App, plugin: CopilotPlugin): Agen
         );
     });
   }
-  const initialSkillsReady = seedManagedBuiltins().catch((error) => {
-    logError("[Skills] Initial discovery pass failed", error);
-  });
+  const initialSkillsReady: Promise<void> = seedManagedBuiltins().then(
+    () => undefined,
+    (error) => {
+      logError("[Skills] Initial discovery pass failed", error);
+    }
+  );
   for (const descriptor of listBackendDescriptors()) {
     const ready = Promise.resolve()
       .then(() => descriptor.onPluginLoad?.(plugin))

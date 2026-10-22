@@ -14,6 +14,11 @@ import type {
   OpenArtifactsLinkAccess,
   OpenArtifactsReceipt,
 } from "@/openArtifacts/types";
+import { getSettings } from "@/settings/model";
+import {
+  areVendorServicesBlocked,
+  VENDOR_SERVICES_BLOCKED_MESSAGE,
+} from "@/vendorServices/vendorServicesPolicy";
 import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from "obsidian";
 
 const DOCS_ENDPOINT = `${OPENARTIFACTS_API_ORIGIN}/api/v1/docs`;
@@ -270,6 +275,16 @@ export class OpenArtifactsClient {
   }
 
   private async request(options: RequestUrlParam): Promise<RequestUrlResponse> {
+    // Checked per request so a publish dialog opened before blocking turned on sends nothing.
+    // https://github.com/spectre009/obsidian-copilot/issues/1
+    if (areVendorServicesBlocked(getSettings())) {
+      throw new OpenArtifactsClientError(
+        VENDOR_SERVICES_BLOCKED_MESSAGE,
+        "vendor_services_blocked",
+        null,
+        false
+      );
+    }
     try {
       return await requestUrl(options);
     } catch {

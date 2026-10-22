@@ -50,6 +50,10 @@ jest.mock("@/settings/model", () => ({
 }));
 jest.mock("@/plusUtils", () => ({
   ensureMultiAgentEntitlement: jest.fn(async () => true),
+  multiAgentRefusalMessage: jest.fn(
+    () =>
+      "Multi-agent QA is a Copilot Plus feature. Upgrade to mention more than one agent in a turn."
+  ),
   showMultiAgentUpgradePrompt: jest.fn(),
 }));
 

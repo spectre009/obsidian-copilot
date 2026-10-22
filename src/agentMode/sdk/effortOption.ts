@@ -8,6 +8,8 @@ import {
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { logInfo, logWarn } from "@/logger";
+import { getSettings } from "@/settings/model";
+import { areVendorServicesBlocked, withoutVendorEnv } from "@/vendorServices/vendorServicesPolicy";
 
 export function synthesizeEffortConfigOption(
   modelInfo: ModelInfo | undefined,
@@ -64,8 +66,14 @@ export async function probeClaudeSdkCatalog(
     await new Promise<void>(() => {});
   })();
   const options: Options = { pathToClaudeCodeExecutable };
-  if (envOverrides && Object.keys(envOverrides).length > 0) {
-    options.env = { ...process.env, ...envOverrides };
+  const settings = getSettings();
+  // The probe is a Claude process too, so it gets the same scrubbed environment as a turn.
+  // https://github.com/spectre009/obsidian-copilot/issues/1
+  if (
+    (envOverrides && Object.keys(envOverrides).length > 0) ||
+    areVendorServicesBlocked(settings)
+  ) {
+    options.env = withoutVendorEnv({ ...process.env, ...envOverrides }, settings);
   }
   const probe = query({ prompt: noopPrompt, options });
   try {

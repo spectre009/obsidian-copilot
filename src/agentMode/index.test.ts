@@ -1,4 +1,4 @@
-import type { App } from "obsidian";
+import { Notice, type App } from "obsidian";
 import type CopilotPlugin from "@/main";
 import type { CopilotSettings } from "@/settings/model";
 import type { InstallState } from "./session/types";
@@ -90,6 +90,7 @@ jest.mock("./session/useBackendAuthState", () => ({}));
 const ISSUE = "https://github.com/logancyang/obsidian-copilot/issues/3022";
 const LINEUP_ISSUE = "https://github.com/Brevilabs/obsidian-copilot-private/issues/319";
 const RELOAD_ISSUE = "https://github.com/Brevilabs/obsidian-copilot-private/issues/475";
+const BLOCK_ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/1";
 type SettingsSubscriber = (prev: CopilotSettings, next: CopilotSettings) => void;
 const mockSettingsSubscribers: SettingsSubscriber[] = [];
 let mockSettings: CopilotSettings;
@@ -161,6 +162,7 @@ describe("agentMode", () => {
   describe("createAgentSessionManager()", () => {
     beforeEach(() => {
       jest.clearAllMocks();
+      jest.mocked(Notice).mockClear();
       mockStates.claude = { kind: "ready", source: "custom" };
       mockStates.opencode = { kind: "absent" };
       reconcile.mockResolvedValue(undefined);
@@ -278,6 +280,52 @@ describe("agentMode", () => {
       gate.resolve();
       await handled.promise;
       expect(mockManager.onInstallStateChanged).toHaveBeenCalledWith("opencode");
+    });
+
+    it.each([true, false])(
+      `${BLOCK_ISSUE} forces a managed-skill refresh as soon as Block vendor services changes to %s`,
+      async (blockVendorServices) => {
+        mockSettings = { ...mockSettings, blockVendorServices: !blockVendorServices };
+        createAgentSessionManager({} as App, plugin);
+        await mockManager.registerPreload.mock.calls[0][1];
+        mockRefresh.mockResolvedValueOnce({
+          ok: true,
+          folder: "copilot/skills",
+          skillCount: 3,
+          reconcileErrorCount: 0,
+        });
+        const refreshesBefore = mockRefresh.mock.calls.length;
+
+        emitSettingsChange(mockSettings, { ...mockSettings, blockVendorServices });
+
+        expect(mockRefresh.mock.calls.length).toBe(refreshesBefore + 1);
+        expect(mockRefresh).toHaveBeenLastCalledWith(true);
+      }
+    );
+
+    it(`${BLOCK_ISSUE} tells the user when blocking left a vendor skill it could not remove`, async () => {
+      mockSettings = { ...mockSettings, blockVendorServices: false };
+      createAgentSessionManager({} as App, plugin);
+      await mockManager.registerPreload.mock.calls[0][1];
+      const noticed = deferred();
+      jest.mocked(Notice).mockImplementationOnce(() => {
+        noticed.resolve();
+        return {} as Notice;
+      });
+      mockRefresh.mockResolvedValueOnce({
+        ok: true,
+        folder: "copilot/skills",
+        skillCount: 3,
+        reconcileErrorCount: 1,
+        reconcileError: "Could not remove disabled built-in skill copilot-fetch-x.",
+      });
+
+      emitSettingsChange(mockSettings, { ...mockSettings, blockVendorServices: true });
+      await noticed.promise;
+
+      expect(Notice).toHaveBeenCalledWith(
+        "Copilot could not remove every vendor skill: Could not remove disabled built-in skill copilot-fetch-x."
+      );
     });
 
     it("https://github.com/Brevilabs/obsidian-copilot-private/issues/599 offers an OpenCode reload after a builtin skill opt-out is reconciled and changes its system prompt", async () => {

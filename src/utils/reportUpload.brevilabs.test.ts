@@ -4,6 +4,8 @@ import { BREVILABS_API_BASE_URL } from "@/constants";
 import { logError } from "@/logger";
 import { createReportUploader, type ReportRequest } from "@/utils/reportUpload.brevilabs";
 import { ReportUploadError, type ReportUploadAttempt } from "@/utils/reportUpload";
+import { setSettings } from "@/settings/model";
+import { VENDOR_SERVICES_BLOCKED_MESSAGE } from "@/vendorServices/vendorServicesPolicy";
 
 jest.mock("@/logger");
 
@@ -50,6 +52,21 @@ async function rejection(promise: Promise<unknown>): Promise<ReportUploadError> 
 
 describe("reportUpload.brevilabs", () => {
   describe("createReportUploader()", () => {
+    beforeEach(() => {
+      setSettings({ blockVendorServices: false });
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 uploads nothing and explains the block when blocking turned on after the dialog opened", async () => {
+      const request = respondWith(201, OK_BODY);
+      const upload = makeUploader(request);
+      setSettings({ blockVendorServices: true });
+
+      const error = await rejection(upload(ATTEMPT));
+
+      expect(error.message).toBe(`Nothing was uploaded. ${VENDOR_SERVICES_BLOCKED_MESSAGE}`);
+      expect(request).not.toHaveBeenCalled();
+    });
+
     it("posts the attempt's bytes to the reports endpoint with exactly the contract's headers", async () => {
       const request = respondWith(201, OK_BODY);
 

@@ -14,6 +14,10 @@ import {
   useSettingsValue,
 } from "@/settings/model";
 import { isDesktopRuntime } from "@/utils/desktopRuntime";
+import {
+  areVendorServicesBlocked,
+  VENDOR_SERVICES_BLOCKED_MESSAGE,
+} from "@/vendorServices/vendorServicesPolicy";
 import { App, Notice } from "obsidian";
 import React from "react";
 
@@ -118,25 +122,30 @@ function hasVerifiedFeature(feature: EntitlementFeature): boolean {
 
 export function isPlusEnabled(): boolean {
   const settings = getSettings();
+  if (areVendorServicesBlocked(settings)) return false;
   if (settings.entitlementExpiresAt > 0) {
     return hasVerifiedFeature("multi_agent");
   }
   return settings.isPlusUser === true;
 }
 
+// Paid features route through vendor servers, so a blocked install reports none of them.
+// https://github.com/spectre009/obsidian-copilot/issues/1
 export function useIsPaidUser(): boolean | undefined {
-  return useSettingsValue().isPaidUser;
+  const settings = useSettingsValue();
+  return areVendorServicesBlocked(settings) ? false : settings.isPaidUser;
 }
 
 function useIsPlusUser(): boolean | undefined {
   const settings = useSettingsValue();
-  if (isEntitlementExpired(settings)) {
+  if (areVendorServicesBlocked(settings) || isEntitlementExpired(settings)) {
     return false;
   }
   return settings.isPlusUser;
 }
 
 export async function ensureMultiAgentEntitlement(app?: App): Promise<boolean> {
+  if (areVendorServicesBlocked(getSettings())) return false;
   if (isPlusEnabled()) {
     return true;
   }
@@ -146,7 +155,17 @@ export async function ensureMultiAgentEntitlement(app?: App): Promise<boolean> {
   return isPlusEnabled();
 }
 
+export function multiAgentRefusalMessage(): string {
+  return areVendorServicesBlocked(getSettings())
+    ? `Multi-agent QA needs Copilot Plus. ${VENDOR_SERVICES_BLOCKED_MESSAGE}`
+    : "Multi-agent QA is a Copilot Plus feature. Upgrade to mention more than one agent in a turn.";
+}
+
 export function showMultiAgentUpgradePrompt(): void {
+  if (areVendorServicesBlocked(getSettings())) {
+    new Notice(multiAgentRefusalMessage(), 8000);
+    return;
+  }
   new Notice(
     "Multi-agent QA (@-mentioning more than one agent in a turn) is a Copilot Plus feature. Opening the upgrade page…",
     8000
@@ -162,6 +181,9 @@ export async function checkIsPaidUser(
   app: App | undefined,
   context: LicenseCheckContext
 ): Promise<boolean | undefined> {
+  // Blocking suspends paid state rather than revoking it, so turning the switch back off restores
+  // it. https://github.com/spectre009/obsidian-copilot/issues/1
+  if (areVendorServicesBlocked(getSettings())) return false;
   if (!getSettings().plusLicenseKey) {
     turnOffPaid(app);
     return false;
@@ -275,7 +297,9 @@ function waitForLicensedChatModelId(): Promise<string | undefined> {
 }
 
 export async function applyLicenseSettings(): Promise<void> {
+  if (areVendorServicesBlocked(getSettings())) return;
   const configuredModelId = await waitForLicensedChatModelId();
+  if (areVendorServicesBlocked(getSettings())) return;
   if (!configuredModelId) {
     logWarn(
       `applyLicenseSettings: ${DEFAULT_COPILOT_PLUS_CHAT_MODEL} was never configured, nothing to apply`
@@ -300,10 +324,17 @@ export async function applyLicenseSettings(): Promise<void> {
 }
 
 export function navigateToPlusPage(medium: ProductUtmMedium): void {
+  // Upsell links are vendor page loads, so a blocked install explains instead of navigating.
+  // https://github.com/spectre009/obsidian-copilot/issues/1
+  if (areVendorServicesBlocked(getSettings())) {
+    new Notice(VENDOR_SERVICES_BLOCKED_MESSAGE);
+    return;
+  }
   window.open(createProductUrl(PRODUCT_URLS.COPILOT_PRICING, medium), "_blank");
 }
 
 export function markPaidPendingEntitlement(): void {
+  if (areVendorServicesBlocked(getSettings())) return;
   setSettings({
     isPaidUser: true,
     isPlusUser: false,
@@ -333,6 +364,11 @@ export async function applyEntitlement(token: string): Promise<boolean> {
   const { userId, plusLicenseKey } = getSettings();
   const claims = await verifyEntitlement(token, { expectedUserId: userId });
   if (!claims) {
+    return false;
+  }
+  // Verification is async, so blocking can turn on before this write.
+  // https://github.com/spectre009/obsidian-copilot/issues/1
+  if (areVendorServicesBlocked(getSettings())) {
     return false;
   }
   setVerified({

@@ -20,6 +20,14 @@ const ISSUE = "https://github.com/logancyang/obsidian-copilot/issues/3022";
 const ISSUE_736 = "https://github.com/Brevilabs/obsidian-copilot-private/issues/736";
 const ISSUE_656 = "https://github.com/Brevilabs/obsidian-copilot-private/issues/656";
 const ISSUE_740 = "https://github.com/Brevilabs/obsidian-copilot-private/issues/740";
+const BLOCK_ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/1";
+const VENDOR_SKILLS = [
+  "copilot-web-search",
+  "copilot-web-fetch",
+  "copilot-youtube-transcript",
+  "copilot-fetch-x",
+  "openartifacts-publish",
+];
 const INSTALLED_PLUS_READ_PDF_MD = `---
 name: copilot-read-pdf
 description: Extract the full text of a PDF as Markdown using Copilot Plus.
@@ -78,6 +86,7 @@ function fixture(preferences?: BuiltinPreferences) {
   };
   const settings = {
     ...DEFAULT_SETTINGS,
+    blockVendorServices: false,
     enableMiyoDocumentProcessing: false,
     agentMode: { ...DEFAULT_SETTINGS.agentMode, skills: { ...DEFAULT_SETTINGS.agentMode.skills } },
   };
@@ -348,6 +357,38 @@ describe("reconcileBuiltinSkills", () => {
 
       expect(f.files.get(f.path("miyo-parse"))).toBe("user-owned content");
     });
+    it(`${BLOCK_ISSUE} removes every seeded vendor skill once vendor services are blocked, keeping Obsidian skills, and restores them when allowed again`, async () => {
+      const f = fixture({});
+      f.options.availableAgents = ["opencode"];
+      await reconcileBuiltinSkills(f.options);
+      expect(f.files.has(f.path("copilot-fetch-x"))).toBe(true);
+      expect(f.files.has(f.path("openartifacts-publish"))).toBe(true);
+
+      f.options.settings.blockVendorServices = true;
+      await reconcileBuiltinSkills(f.options);
+
+      for (const name of VENDOR_SKILLS) expect(f.files.has(f.path(name))).toBe(false);
+      expect(f.files.has(f.path("obsidian-markdown"))).toBe(true);
+
+      f.options.settings.blockVendorServices = false;
+      await reconcileBuiltinSkills(f.options);
+      expect(f.files.has(f.path("copilot-fetch-x"))).toBe(true);
+    });
+
+    it(`${BLOCK_ISSUE} reports a vendor skill it could not remove after blocking, so the failure is visible`, async () => {
+      const f = fixture({});
+      f.options.availableAgents = ["opencode"];
+      await reconcileBuiltinSkills(f.options);
+      f.options.settings.blockVendorServices = true;
+      f.options.fs.removeDir = async () => {
+        throw new Error("permission denied");
+      };
+
+      await expect(reconcileBuiltinSkills(f.options)).rejects.toThrow(
+        "Could not remove disabled built-in skill copilot-fetch-x"
+      );
+    });
+
     it(`deletes disabled managed copies but preserves user-owned name collisions ${ISSUE}`, async () => {
       const skill = BUILTIN_SKILLS[0];
       const f = fixture();

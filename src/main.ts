@@ -74,6 +74,8 @@ import {
   startActiveWebTabTracking,
 } from "@/services/webViewerService/webViewerServiceSingleton";
 import { WebSelectionTracker } from "@/services/webViewerService/webViewerServiceSelection";
+import { vendorServicesTransition } from "@/vendorServices/vendorServicesPolicy";
+import { refreshLatestVersion } from "@/hooks/useLatestVersion";
 import { runSettingsMigrations } from "@/settings/migrations";
 import {
   cleanupLegacyIndexArtifacts,
@@ -275,6 +277,12 @@ export default class CopilotPlugin extends Plugin implements CopilotStartup {
         }
         if (plusSyncNeeded(prev, next)) {
           syncPlus(next.isPaidUser, next.plusLicenseKey);
+        }
+        // Blocking skipped every license and release check, so both may be stale once allowed.
+        // https://github.com/spectre009/obsidian-copilot/issues/1
+        if (vendorServicesTransition(prev, next) === "allowed") {
+          void checkIsPaidUser(this.app, { trigger: "manual" });
+          refreshLatestVersion();
         }
       })();
     });

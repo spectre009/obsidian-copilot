@@ -9,6 +9,9 @@ import { updateSetting, useSettingsValue } from "@/settings/model";
 import { ExternalLink, Loader2 } from "lucide-react";
 import React, { useState } from "react";
 import { safeAsyncHandler } from "@/utils/safeAsyncHandler";
+import { cn } from "@/lib/utils";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
+import { BlockVendorServicesSetting } from "@/vendorServices/ui/BlockVendorServicesSetting";
 
 function getPlusUsageMock(): { currentPct: number; weeklyPct: number } | null {
   return null;
@@ -26,9 +29,26 @@ export function PlusSettings() {
   const licenseStatus = isChecking ? "none" : license.status;
   const [localLicenseKey, setLocalLicenseKey] = useState(settings.plusLicenseKey);
   const usageData = getPlusUsageMock();
+  const blocked = areVendorServicesBlocked(settings);
+  const sectionClassName = cn(
+    "tw-flex tw-flex-col tw-gap-4 tw-rounded-xl tw-border tw-border-solid tw-border-border tw-p-4 tw-shadow-sm tw-bg-interactive-accent/10"
+  );
+  const vendorServicesSetting = (
+    <BlockVendorServicesSetting
+      blocked={blocked}
+      onBlockedChange={(next) => updateSetting("blockVendorServices", next)}
+    />
+  );
+
+  // A blocked install shows no license entry or upsell, since neither can reach the vendor.
+  // https://github.com/spectre009/obsidian-copilot/issues/1
+  if (blocked) {
+    return <section className={sectionClassName}>{vendorServicesSetting}</section>;
+  }
 
   return (
-    <section className="tw-flex tw-flex-col tw-gap-4 tw-rounded-xl tw-border tw-border-solid tw-border-border tw-p-4 tw-shadow-sm tw-bg-interactive-accent/10">
+    <section className={sectionClassName}>
+      {vendorServicesSetting}
       <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-text-lg tw-font-semibold">
         <span>Copilot License</span>
         {licenseStatus === "active" && (

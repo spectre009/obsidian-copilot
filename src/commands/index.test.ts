@@ -51,10 +51,68 @@ describe("commands", () => {
     beforeEach(() => {
       jest.clearAllMocks();
       jest.mocked(getSettings).mockReturnValue({
+        blockVendorServices: false,
         enableMiyo: false,
         miyoServerUrl: "",
       } as ReturnType<typeof getSettings>);
       mockRequestMiyoIndexRefresh.mockResolvedValue(undefined);
+    });
+
+    function blockVendorServices(): void {
+      jest.mocked(getSettings).mockReturnValue({
+        ...jest.mocked(getSettings)(),
+        blockVendorServices: true,
+      });
+    }
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 hides the OpenArtifacts palette command while vendor services are blocked and shows it again once allowed", () => {
+      const activeFile = markdownFile("Notes/Active.md");
+      const commands: Command[] = [];
+      const plugin = {
+        addCommand: jest.fn((command: Command) => commands.push(command)),
+        app: { workspace: { getActiveFile: jest.fn(() => activeFile) } },
+      } as unknown as CopilotPlugin;
+      const publish = jest.fn();
+      registerCommands(plugin, publish);
+      const command = commands.find(({ id }) => id === COMMAND_IDS.PUBLISH_FILE_TO_OPENARTIFACTS);
+
+      blockVendorServices();
+      expect(command?.checkCallback?.(true)).toBe(false);
+      expect(command?.checkCallback?.(false)).toBe(false);
+      expect(publish).not.toHaveBeenCalled();
+
+      jest.mocked(getSettings).mockReturnValue({
+        blockVendorServices: false,
+      } as ReturnType<typeof getSettings>);
+      expect(command?.checkCallback?.(true)).toBe(true);
+    });
+
+    it("offers the YouTube transcript command while vendor services are allowed", () => {
+      const commands: Command[] = [];
+      const plugin = {
+        addCommand: jest.fn((command: Command) => commands.push(command)),
+        app: { workspace: { getActiveFile: jest.fn(() => null) } },
+      } as unknown as CopilotPlugin;
+      registerCommands(plugin, jest.fn());
+
+      const command = commands.find(({ id }) => id === COMMAND_IDS.DOWNLOAD_YOUTUBE_SCRIPT);
+
+      expect(command?.checkCallback?.(true)).toBe(true);
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 hides the YouTube transcript command while vendor services are blocked, without a license check", () => {
+      const commands: Command[] = [];
+      const plugin = {
+        addCommand: jest.fn((command: Command) => commands.push(command)),
+        app: { workspace: { getActiveFile: jest.fn(() => null) } },
+      } as unknown as CopilotPlugin;
+      registerCommands(plugin, jest.fn());
+      const command = commands.find(({ id }) => id === COMMAND_IDS.DOWNLOAD_YOUTUBE_SCRIPT);
+
+      blockVendorServices();
+
+      expect(command?.checkCallback?.(true)).toBe(false);
+      expect(command?.checkCallback?.(false)).toBe(false);
     });
 
     it("registers the new Quick Chat command with a name distinct from Agent Chat", () => {

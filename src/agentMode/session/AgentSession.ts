@@ -49,7 +49,11 @@ import {
   MessageContext,
 } from "@/types/message";
 import { err2String, formatDateTime, type FormattedDateTime } from "@/utils";
-import { ensureMultiAgentEntitlement, showMultiAgentUpgradePrompt } from "@/plusUtils";
+import {
+  ensureMultiAgentEntitlement,
+  multiAgentRefusalMessage,
+  showMultiAgentUpgradePrompt,
+} from "@/plusUtils";
 import type { App, DataAdapter } from "obsidian";
 import { MethodUnsupportedError } from "@/agentMode/session/errors";
 import {
@@ -779,11 +783,7 @@ export class AgentSession {
       ) {
         if (!(await this.ensureMultiAgentEntitlement())) {
           showMultiAgentUpgradePrompt();
-          return this.refuseTurn(
-            placeholderId,
-            turnStartedAtMs,
-            "Multi-agent QA is a Copilot Plus feature. Upgrade to mention more than one agent in a turn."
-          );
+          return this.refuseTurn(placeholderId, turnStartedAtMs, multiAgentRefusalMessage());
         }
 
         const historyBlock = buildConversationHistoryBlock(

@@ -5,6 +5,8 @@ jest.mock("@anthropic-ai/claude-agent-sdk", () => ({
 
 import type { ModelInfo } from "@anthropic-ai/claude-agent-sdk";
 import { getCachedSdkCatalog, probeClaudeSdkCatalog } from "./effortOption";
+import { PLUS_ENV } from "@/builtinSkills/builtinSkills";
+import { setSettings } from "@/settings/model";
 
 const CATALOG: ModelInfo[] = [{ value: "claude-x", displayName: "Claude X", description: "test" }];
 
@@ -32,11 +34,24 @@ describe("effortOption", () => {
       expect(opts.env).toEqual({ ...process.env, ANTHROPIC_MODEL: "m-custom" });
     });
 
-    it("leaves options.env unset when no env overrides are given", async () => {
+    it("leaves options.env unset when no env overrides are given and vendor services are allowed", async () => {
+      setSettings({ blockVendorServices: false });
       queryMock.mockReturnValue(fakeProbe(CATALOG));
       await probeClaudeSdkCatalog("/bin/claude", undefined);
       const opts = (queryMock.mock.calls[0][0] as { options: { env?: unknown } }).options;
       expect(opts.env).toBeUndefined();
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 hands the probe an environment without vendor variables while vendor services are blocked", async () => {
+      setSettings({ blockVendorServices: true });
+      queryMock.mockReturnValue(fakeProbe(CATALOG));
+
+      await probeClaudeSdkCatalog("/bin/claude", { [PLUS_ENV.licenseKey]: "license", A: "1" });
+
+      const opts = (queryMock.mock.calls[0][0] as { options: { env?: Record<string, string> } })
+        .options;
+      expect(opts.env?.A).toBe("1");
+      for (const key of Object.values(PLUS_ENV)) expect(opts.env).not.toHaveProperty(key);
     });
   });
 

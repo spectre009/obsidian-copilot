@@ -138,6 +138,14 @@ export const UploadFailed: StoryObj<ReportIssueFlowProps> = {
   ),
 };
 
+export const UploadsTurnedOff: StoryObj<ReportIssueFlowProps> = {
+  render: () => <ReportIssueFlow {...BASE} upload={undefined} />,
+};
+
+export const ReviewWithoutUpload: StoryObj<ReportIssueFlowProps> = {
+  render: () => <AtStep steps={[PREPARE]} props={{ upload: undefined }} />,
+};
+
 export const DraftedNote: StoryObj<ReportIssueFlowProps> = {
   render: () => (
     <ReportIssueFlow

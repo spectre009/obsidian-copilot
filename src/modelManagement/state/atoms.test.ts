@@ -1,7 +1,13 @@
 import { getSettings, resetSettings, setSettings, settingsStore } from "@/settings/model";
 import type { ConfiguredModel, Provider } from "@/modelManagement/types/persisted";
 
-import { chatBackendPickerAtom, byokProvidersAtom, visibleByokProvidersAtom } from "./atoms";
+import {
+  byokProvidersAtom,
+  chatBackendPickerAtom,
+  copilotPlusCatalogAtom,
+  providersAtom,
+  visibleByokProvidersAtom,
+} from "./atoms";
 
 function provider(id: string, origin: Provider["origin"], baseUrl?: string): Provider {
   return {
@@ -25,6 +31,12 @@ function model(configuredModelId: string, providerId: string): ConfiguredModel {
 
 const CLOUD = provider("cloud", { kind: "byok" }, "https://api.anthropic.com");
 const LOCAL = provider("local", { kind: "byok" }, "http://localhost:11434/v1");
+const PLUS = provider("plus", { kind: "copilot-plus" }, "https://models.brevilabs.com/v1");
+const BLOCK_ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/1";
+const CATALOG = {
+  models: [{ id: "glm-5.2", displayName: "GLM-5.2" }],
+  defaultEnabledIds: ["glm-5.2"],
+};
 
 beforeEach(() => {
   resetSettings();
@@ -70,6 +82,26 @@ describe("atoms", () => {
       expect(warningById()["cloud-m"]).toBe(false);
     });
 
+    it(`drops a Copilot Plus model from the picker while vendor services are blocked — ${BLOCK_ISSUE}`, () => {
+      setSettings({
+        providers: { cloud: CLOUD, plus: PLUS },
+        configuredModels: [model("cloud-m", "cloud"), model("plus-m", "plus")],
+        backends: { chat: { enabledModels: ["cloud-m", "plus-m"] } },
+      });
+      const okIds = () =>
+        settingsStore
+          .get(chatBackendPickerAtom)
+          .filter((e) => e.state === "ok")
+          .map((e) => e.configuredModelId);
+
+      setSettings({ blockVendorServices: false });
+      expect(okIds()).toEqual(["cloud-m", "plus-m"]);
+
+      setSettings({ blockVendorServices: true });
+      expect(okIds()).toEqual(["cloud-m"]);
+      expect(getSettings().backends.chat?.enabledModels).toEqual(["cloud-m", "plus-m"]);
+    });
+
     it("returns the same empty list on every read when no models are enabled", () => {
       setSettings({
         backends: { chat: { enabledModels: [] } },
@@ -79,6 +111,44 @@ describe("atoms", () => {
       const b = settingsStore.get(chatBackendPickerAtom);
       expect(a).toHaveLength(0);
       expect(a).toBe(b);
+    });
+  });
+
+  describe("providersAtom", () => {
+    beforeEach(() => {
+      setSettings({ providers: { cloud: CLOUD, plus: PLUS } });
+    });
+
+    it("exposes every stored provider while vendor services are allowed", () => {
+      setSettings({ blockVendorServices: false });
+
+      expect(Object.keys(settingsStore.get(providersAtom)).sort()).toEqual(["cloud", "plus"]);
+    });
+
+    it(`hides the Copilot Plus provider while blocked and keeps it in settings — ${BLOCK_ISSUE}`, () => {
+      setSettings({ blockVendorServices: true });
+
+      expect(Object.keys(settingsStore.get(providersAtom))).toEqual(["cloud"]);
+      expect(getSettings().providers.plus).toEqual(PLUS);
+    });
+  });
+
+  describe("copilotPlusCatalogAtom", () => {
+    beforeEach(() => {
+      setSettings({ copilotPlusCatalog: CATALOG });
+    });
+
+    it("exposes the cached Copilot Plus lineup while vendor services are allowed", () => {
+      setSettings({ blockVendorServices: false });
+
+      expect(settingsStore.get(copilotPlusCatalogAtom)).toEqual(CATALOG);
+    });
+
+    it(`exposes an empty lineup while blocked and keeps the cached one in settings — ${BLOCK_ISSUE}`, () => {
+      setSettings({ blockVendorServices: true });
+
+      expect(settingsStore.get(copilotPlusCatalogAtom).models).toEqual([]);
+      expect(getSettings().copilotPlusCatalog).toEqual(CATALOG);
     });
   });
 

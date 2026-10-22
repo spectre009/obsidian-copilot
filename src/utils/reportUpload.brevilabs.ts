@@ -5,6 +5,11 @@ import {
   type ReportUploader,
   type ReportUploadResult,
 } from "@/utils/reportUpload";
+import { getSettings } from "@/settings/model";
+import {
+  areVendorServicesBlocked,
+  VENDOR_SERVICES_BLOCKED_MESSAGE,
+} from "@/vendorServices/vendorServicesPolicy";
 import { requestUrl } from "obsidian";
 
 const REPORTS_ENDPOINT = `${BREVILABS_API_BASE_URL}/reports`;
@@ -73,6 +78,11 @@ function readUploadResult(status: number, text: string): ReportUploadResult {
 export function createReportUploader(deps: ReportUploaderDeps): ReportUploader {
   const request = deps.request ?? requestUrl;
   return async (attempt) => {
+    // Checked at upload time so a report dialog opened before blocking turned on sends nothing.
+    // https://github.com/spectre009/obsidian-copilot/issues/1
+    if (areVendorServicesBlocked(getSettings())) {
+      throw new ReportUploadError(`Nothing was uploaded. ${VENDOR_SERVICES_BLOCKED_MESSAGE}`);
+    }
     // The server rate-limits and dedupes on the install id, so an upload without a usable id would be rejected after spending an upload slot.
     // https://github.com/Brevilabs/obsidian-copilot-private/issues/202
     let installId: string;

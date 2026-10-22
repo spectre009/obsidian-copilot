@@ -108,6 +108,9 @@ import { migrateCommands } from "@/commands/migrator";
 import { migrateSystemPromptsFromSettings } from "@/system-prompts/migration";
 import { logFileManager } from "@/logFileManager";
 import { flushPersistence, resetPersistenceState } from "@/services/settingsPersistence";
+import * as plusUtils from "@/plusUtils";
+import * as latestVersion from "@/hooks/useLatestVersion";
+import { waitFor } from "@testing-library/react";
 import { migrateOpenArtifactsFolder } from "@/openArtifacts/openArtifactsLedger";
 import { startActiveWebTabTracking } from "@/services/webViewerService/webViewerServiceSingleton";
 import { isDesktopRuntime } from "@/utils/desktopRuntime";
@@ -724,6 +727,43 @@ describe("main", () => {
           expect(openRegisteredView(CHAT_VIEWTYPE)).toBeInstanceOf(StartupLoadingView);
         }
       );
+
+      it("https://github.com/spectre009/obsidian-copilot/issues/1 re-checks the license and the release feed when Block vendor services turns off, and not when it turns on", async () => {
+        settingsStore.set(settingsAtom, { ...DEFAULT_SETTINGS, blockVendorServices: true });
+        const { plugin, finishStartup } = createLoadingPlugin();
+        plugin.onload();
+        await finishStartup();
+        const recheck = jest.spyOn(plusUtils, "checkIsPaidUser").mockResolvedValue(false);
+        const refreshRelease = jest.spyOn(latestVersion, "refreshLatestVersion");
+        try {
+          settingsStore.set(settingsAtom, {
+            ...settingsStore.get(settingsAtom),
+            blockVendorServices: false,
+          });
+          await waitFor(() =>
+            expect(recheck).toHaveBeenCalledWith(plugin.app, { trigger: "manual" })
+          );
+          expect(refreshRelease).toHaveBeenCalled();
+
+          recheck.mockClear();
+          settingsStore.set(settingsAtom, {
+            ...settingsStore.get(settingsAtom),
+            blockVendorServices: true,
+          });
+          settingsStore.set(settingsAtom, {
+            ...settingsStore.get(settingsAtom),
+            blockVendorServices: false,
+          });
+          const callsForThisPlugin = () =>
+            recheck.mock.calls.filter(([app]) => app === plugin.app).length;
+          await waitFor(() => expect(callsForThisPlugin()).toBeGreaterThan(0));
+          expect(callsForThisPlugin()).toBe(1);
+        } finally {
+          recheck.mockRestore();
+          refreshRelease.mockRestore();
+          plugin.settingsUnsubscriber?.();
+        }
+      });
 
       it("loads settings only after the previous copy finishes shutting down https://github.com/logancyang/obsidian-copilot/issues/3518", async () => {
         const calls: string[] = [];

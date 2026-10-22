@@ -26,6 +26,7 @@ import {
   sanitizeBuiltinSkillEnvOverrides,
 } from "@/agentMode/backends/shared/builtinSkillEnv";
 import { getVaultBase } from "@/utils/vaultPath";
+import { withoutVendorEnv } from "@/vendorServices/vendorServicesPolicy";
 import { urlDestination } from "@/modelManagement";
 import type { Destination } from "@/types/destination";
 import type {
@@ -130,9 +131,9 @@ function isEnabledFlag(value: unknown): boolean {
 
 function claudeChildEnv(settings: CopilotSettings): NodeJS.ProcessEnv {
   const overrides = settings.agentMode?.backends?.claude?.envOverrides;
-  return overrides && Object.keys(overrides).length > 0
-    ? { ...process.env, ...overrides }
-    : process.env;
+  const env =
+    overrides && Object.keys(overrides).length > 0 ? { ...process.env, ...overrides } : process.env;
+  return withoutVendorEnv(env, settings);
 }
 
 function claudeCompatibilityInput(

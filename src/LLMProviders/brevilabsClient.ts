@@ -3,6 +3,10 @@ import { MissingPlusLicenseError } from "@/error";
 import { logInfo } from "@/logger";
 import { applyEntitlement, markPaidPendingEntitlement, turnOffPaid } from "@/plusUtils";
 import { getSettings } from "@/settings/model";
+import {
+  areVendorServicesBlocked,
+  assertVendorServicesAllowed,
+} from "@/vendorServices/vendorServicesPolicy";
 import { App, requestUrl } from "obsidian";
 
 interface BrevilabsApiResult<T> {
@@ -171,6 +175,7 @@ export class BrevilabsClient {
     excludeAuthHeader = false,
     skipLicenseCheck = false
   ): Promise<BrevilabsApiResult<T>> {
+    assertVendorServicesAllowed(getSettings());
     if (!skipLicenseCheck) {
       this.checkLicenseKey();
     }
@@ -243,6 +248,12 @@ export class BrevilabsClient {
       return { isValid: undefined };
     }
 
+    // A response that lands after blocking turned on must not restore or revoke paid state.
+    // https://github.com/spectre009/obsidian-copilot/issues/1
+    if (areVendorServicesBlocked(getSettings())) {
+      return { isValid: undefined };
+    }
+
     if (error) {
       // Revoke only on a 403 with an API error body; a bare 403 comes from a gateway or WAF and says nothing about the key.
       // https://github.com/Brevilabs/obsidian-copilot-private/issues/307
@@ -280,8 +291,9 @@ export class BrevilabsClient {
   }
 
   async getUsage(): Promise<UsageResponse | null> {
-    const licenseKey = getSettings().plusLicenseKey;
-    if (!licenseKey) return null;
+    const settings = getSettings();
+    const licenseKey = settings.plusLicenseKey;
+    if (!licenseKey || areVendorServicesBlocked(settings)) return null;
 
     try {
       const response = await requestUrl({
@@ -305,6 +317,7 @@ export class BrevilabsClient {
   }
 
   async getModels(): Promise<BrevilabsModelsResponse | null> {
+    if (areVendorServicesBlocked(getSettings())) return null;
     try {
       const response = await requestUrl({
         url: `${BREVILABS_MODELS_BASE_URL}/models`,

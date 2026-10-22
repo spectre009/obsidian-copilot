@@ -8,6 +8,7 @@ import { ReactModal } from "@/components/modals/ReactModal";
 import { requestReleaseNotesSince } from "@/components/release-update/releaseNotes";
 import { AppContext } from "@/context";
 import { renderMarkdown } from "@/utils/renderMarkdown";
+import { setSettings } from "@/settings/model";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App } from "obsidian";
 import * as React from "react";
@@ -83,6 +84,46 @@ describe("ReleaseNotesDialog", () => {
         await act(async () => {
           ReactModal.prototype.onClose.call(modal);
         });
+      });
+
+      const VENDOR_IMAGE = "https://images.brevilabs.com/newsletters/release/feature.png";
+      const VENDOR_RELEASE = {
+        ...RELEASE,
+        body: `# v4.0.4\n\n![Feature card](${VENDOR_IMAGE})`,
+      } satisfies ReleaseNotes;
+
+      async function renderedMarkdown(): Promise<string[]> {
+        const modal = new ReleaseNotesModal(new App(), VENDOR_RELEASE, "4.0.2");
+        modal.contentEl.empty = () => modal.contentEl.replaceChildren();
+        jest.mocked(requestReleaseNotesSince).mockReturnValue(new Promise(() => {}));
+        const seen: string[] = [];
+        jest.mocked(renderMarkdown).mockImplementation(async (_app, markdown) => {
+          seen.push(markdown);
+        });
+        await act(async () => {
+          ReactModal.prototype.onOpen.call(modal);
+        });
+        await act(async () => {
+          ReactModal.prototype.onClose.call(modal);
+        });
+        return seen;
+      }
+
+      afterEach(() => setSettings({ blockVendorServices: true }));
+
+      it("renders vendor-hosted release images while vendor services are allowed", async () => {
+        setSettings({ blockVendorServices: false });
+
+        expect((await renderedMarkdown()).join("\n")).toContain(VENDOR_IMAGE);
+      });
+
+      it("https://github.com/spectre009/obsidian-copilot/issues/1 replaces vendor-hosted release images with their alt text while blocked", async () => {
+        setSettings({ blockVendorServices: true });
+
+        const markdown = (await renderedMarkdown()).join("\n");
+
+        expect(markdown).not.toContain("brevilabs");
+        expect(markdown).toContain("Feature card");
       });
     });
   });

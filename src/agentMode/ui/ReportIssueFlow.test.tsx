@@ -154,6 +154,26 @@ describe("ReportIssueFlow", () => {
       });
     });
 
+    describe("without an upload path (https://github.com/spectre009/obsidian-copilot/issues/1)", () => {
+      it("explains that uploads are off instead of promising an upload", () => {
+        renderFlow({ upload: undefined });
+
+        expect(screen.getByText("Uploads are turned off")).toBeTruthy();
+        expect(screen.queryByText(/Reports are private and deleted after 60 days/)).toBeNull();
+      });
+
+      it("offers only the manual issue page on review, which opens the manual issue URL", async () => {
+        const { props } = renderFlow({ upload: undefined });
+        submit();
+        await awaitPrepared();
+
+        expect(screen.queryByRole("button", { name: /Upload & open issue/ })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Open issue" }));
+
+        expect(props.openIssuePage).toHaveBeenCalledWith(prepared.manualIssueUrl);
+      });
+    });
+
     describe("preparing", () => {
       it("shows the review page from the first frame and fills in the manifest once prepare lands", async () => {
         renderFlow();

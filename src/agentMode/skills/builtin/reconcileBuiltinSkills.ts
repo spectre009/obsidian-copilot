@@ -42,7 +42,7 @@ export async function reconcileBuiltinSkills(options: ReconcileBuiltinOptions): 
   // deleting another device's tools. https://github.com/logancyang/obsidian-copilot/issues/3022
   const seed = BUILTIN_SKILLS.filter(
     (skill) =>
-      !builtinSkillUnavailableReason(skill.name) &&
+      !builtinSkillUnavailableReason(skill.name, settings) &&
       enabledAgents[skill.name].some((agent) => availableAgents.includes(agent))
   );
   await seedBuiltinSkills({ skillsFolderRelPath: folder, fs, skills: seed, enabledAgents });

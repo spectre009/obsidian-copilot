@@ -42,6 +42,7 @@ describe("builtinSkillEnv", () => {
   describe("buildBuiltinSkillEnv()", () => {
     it("returns the service credentials and relay config for an active Plus user", async () => {
       mockGetSettings.mockReturnValue({
+        blockVendorServices: false,
         isPaidUser: true,
         plusLicenseKey: "hydrated-key",
         userId: "user-123",
@@ -55,6 +56,17 @@ describe("builtinSkillEnv", () => {
         [PLUS_ENV.clientVersion]: "4.0.0",
       });
       expect(env).not.toHaveProperty("OPENARTIFACTS_TOKEN");
+    });
+
+    it("injects no license or relay variable for an active Plus user while vendor services are blocked — https://github.com/spectre009/obsidian-copilot/issues/1", async () => {
+      mockGetSettings.mockReturnValue({
+        blockVendorServices: true,
+        isPaidUser: true,
+        plusLicenseKey: "hydrated-key",
+        userId: "user-123",
+      });
+
+      expect(await buildBuiltinSkillEnv("4.0.0")).toEqual({});
     });
 
     it("returns empty when the user is not a Plus subscriber", async () => {
@@ -132,6 +144,7 @@ describe("builtinSkillEnv", () => {
 
     it("merges MIYO_URL with the Plus relay env for a Plus user with a custom Miyo URL", async () => {
       mockGetSettings.mockReturnValue({
+        blockVendorServices: false,
         isPaidUser: true,
         plusLicenseKey: "hydrated-key",
         userId: "user-123",
@@ -246,6 +259,23 @@ describe("builtinSkillEnv", () => {
         expect(getBuiltinSkillEnvRestartPolicy(prev, next, "claude")).toBe("none");
       }
     );
+
+    it.each(["opencode", "claude", "codex"])(
+      "https://github.com/spectre009/obsidian-copilot/issues/1 asks for an immediate (non-deferred) restart of %s when Block vendor services turns on",
+      (backendId) => {
+        const prev = { blockVendorServices: false } as ReturnType<typeof getSettings>;
+        const next = { blockVendorServices: true } as ReturnType<typeof getSettings>;
+
+        expect(getBuiltinSkillEnvRestartPolicy(prev, next, backendId)).toBe("immediate");
+      }
+    );
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 asks for a deferred refresh when Block vendor services turns off, like any other license change", () => {
+      const prev = { blockVendorServices: true } as ReturnType<typeof getSettings>;
+      const next = { blockVendorServices: false } as ReturnType<typeof getSettings>;
+
+      expect(getBuiltinSkillEnvRestartPolicy(prev, next, "claude")).toBe("deferred");
+    });
 
     it("https://github.com/Brevilabs/obsidian-copilot-private/issues/121 keeps spawn-time state for unrelated settings changes", () => {
       const prev = { miyoSearchAll: false, contextTurns: 5 } as ReturnType<typeof getSettings>;

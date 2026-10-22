@@ -6,6 +6,8 @@ import {
 } from "@/components/release-update/releaseNotes";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useSettingsValue } from "@/settings/model";
+import { areVendorServicesBlocked, stripVendorImages } from "@/vendorServices/vendorServicesPolicy";
 import { AlertTriangle, ArrowUpCircle, ExternalLink, LoaderCircle } from "lucide-react";
 import { App } from "obsidian";
 import * as React from "react";
@@ -120,12 +122,24 @@ function SkippedReleaseNotes({
   onClose,
 }: SkippedReleaseNotesProps): React.ReactElement {
   const [releases, setReleases] = React.useState<ReleaseNotes[]>(() => [latest]);
+  const blocked = areVendorServicesBlocked(useSettingsValue());
+  // Release notes embed vendor-hosted images, which load the moment the Markdown renders.
+  // https://github.com/spectre009/obsidian-copilot/issues/1
+  const shown = React.useMemo(
+    () =>
+      blocked
+        ? releases.map((release) => ({ ...release, body: stripVendorImages(release.body) }))
+        : releases,
+    [blocked, releases]
+  );
 
   React.useEffect(() => {
     void requestReleaseNotesSince(currentVersion, latest).then(setReleases);
   }, [currentVersion, latest]);
 
-  return <ReleaseNotesDialogContent onClose={onClose} state={{ status: "ready", releases }} />;
+  return (
+    <ReleaseNotesDialogContent onClose={onClose} state={{ status: "ready", releases: shown }} />
+  );
 }
 
 export class ReleaseNotesModal extends FullBleedReactModal {

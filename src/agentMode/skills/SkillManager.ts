@@ -261,7 +261,7 @@ export class SkillManager {
         if (!skill.builtin || !availableAgents) return skill;
         return {
           ...skill,
-          enabledAgents: builtinSkillUnavailableReason(skill.name)
+          enabledAgents: builtinSkillUnavailableReason(skill.name, settings)
             ? []
             : availableAgents.filter((agent) =>
                 isBuiltinSkillEnabledFor(settings, skill.name, agent)

@@ -151,6 +151,7 @@ function makeManager(opts: {
 }
 
 const emptySettings = {
+  blockVendorServices: false,
   providers: {},
   copilotPlusCatalog: {
     models: [
@@ -246,6 +247,30 @@ describe("agentModelPickerHelpers", () => {
       expect(entries.slice(0, locked.length).every((model) => model._needsLicense)).toBe(true);
       expect(entries[entries.length - 1].name).toBe("catalog-model");
       expect(locked.every((model) => model._group === descriptor.displayName)).toBe(true);
+    });
+
+    it("previews no locked Copilot row while vendor services are blocked — https://github.com/spectre009/obsidian-copilot/issues/1", () => {
+      const entry = makeModelEntry("catalog-model");
+      const descriptor = {
+        ...makeDescriptor("opencode"),
+        routesCopilotModels: true,
+        getEnabledModelEntries: () => [
+          { baseModelId: entry.baseModelId, name: entry.name, credentialState: "ok" as const },
+        ],
+      } as unknown as BackendDescriptor;
+      const manager = {
+        getCachedModelCatalog: () => ({ availableModels: [entry] }),
+        getPreloadStatus: () => "ready",
+        getDefaultSelection: () => null,
+      } as unknown as AgentSessionManager;
+
+      const { entries } = buildPickerEntries(manager, [descriptor], {} as ModelActiveContext, {
+        ...emptySettings,
+        blockVendorServices: true,
+      });
+
+      expect(entries.filter((model) => model._needsLicense)).toEqual([]);
+      expect(entries.map((model) => model.name)).toEqual(["catalog-model"]);
     });
 
     it("previews nothing for an agent that cannot route Copilot models", () => {

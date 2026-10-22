@@ -28,3 +28,7 @@ export const CopilotPlus: StoryObj<ChatModeSelectorProps> = {
 export const FreeUserUpsell: StoryObj<ChatModeSelectorProps> = {
   args: { isPaidUser: false },
 };
+
+export const VendorServicesBlocked: StoryObj<ChatModeSelectorProps> = {
+  args: { isPaidUser: false, plusModeHidden: true },
+};

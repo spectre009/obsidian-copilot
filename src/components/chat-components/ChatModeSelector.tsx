@@ -8,6 +8,7 @@ import React from "react";
 interface ChatModeSelectorProps {
   selectedChain: ChainType;
   isPaidUser: boolean;
+  plusModeHidden?: boolean;
   onModeChange: (chainType: ChainType) => void;
   onPlusUpsell: () => void;
   defaultOpen?: boolean;
@@ -16,6 +17,7 @@ interface ChatModeSelectorProps {
 export function ChatModeSelector({
   selectedChain,
   isPaidUser,
+  plusModeHidden = false,
   onModeChange,
   onPlusUpsell,
   defaultOpen,
@@ -39,7 +41,7 @@ export function ChatModeSelector({
         <DropdownMenuItem onSelect={() => onModeChange(ChainType.LLM_CHAIN)}>
           chat (free)
         </DropdownMenuItem>
-        {isPaidUser ? (
+        {plusModeHidden ? null : isPaidUser ? (
           <DropdownMenuItem onSelect={() => onModeChange(ChainType.COPILOT_PLUS_CHAIN)}>
             <div className="tw-flex tw-items-center tw-gap-1">
               <Sparkles className="tw-size-4" />

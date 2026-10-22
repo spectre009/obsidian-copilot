@@ -77,7 +77,7 @@ export function buildAgentSystemPrompt(backendId: BackendId, backendSteering?: s
   const builtinPrompt = !getDisableBuiltinSystemPrompt();
   const enabled = (skill: string) =>
     builtinPrompt &&
-    !builtinSkillUnavailableReason(skill) &&
+    !builtinSkillUnavailableReason(skill, settings) &&
     isBuiltinSkillEnabledFor(settings, skill, backendId);
   const parts: string[] = [];
 

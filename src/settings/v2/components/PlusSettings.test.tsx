@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from "@/constants";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 
 const updateSetting = jest.fn<void, unknown[]>();
@@ -39,12 +39,40 @@ import { PlusSettings } from "./PlusSettings";
 describe("PlusSettings", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    currentSettings = { ...DEFAULT_SETTINGS };
+    currentSettings = { ...DEFAULT_SETTINGS, blockVendorServices: false };
     mockLicenseState = { status: "none" };
     mockIsPaidUser = false;
   });
 
   describe("PlusSettings()", () => {
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 shows only the switched-on Block vendor services toggle and its explanation while blocked, with no license entry or upsell", () => {
+      currentSettings = { ...DEFAULT_SETTINGS, blockVendorServices: true };
+
+      render(<PlusSettings />);
+
+      expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("true");
+      expect(screen.getByText(/Your stored license and model settings are kept/)).toBeTruthy();
+      expect(screen.queryByPlaceholderText("Enter your license key")).toBeNull();
+      expect(screen.queryByRole("link", { name: "Copilot paid plans" })).toBeNull();
+      expect(screen.queryByText("Copilot License")).toBeNull();
+    });
+
+    it("turns Block vendor services off through the setting when the user flips the toggle", () => {
+      currentSettings = { ...DEFAULT_SETTINGS, blockVendorServices: true };
+      render(<PlusSettings />);
+
+      fireEvent.click(screen.getByRole("switch"));
+
+      expect(updateSetting).toHaveBeenCalledWith("blockVendorServices", false);
+    });
+
+    it("shows the toggle switched off above the license section while vendor services are allowed", () => {
+      render(<PlusSettings />);
+
+      expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
+      expect(screen.getByPlaceholderText("Enter your license key")).toBeTruthy();
+    });
+
     it("attributes the license link and pairing CTA to distinct Copilot surfaces", () => {
       render(<PlusSettings />);
 

@@ -8,6 +8,7 @@ import {
 import { getModelKeyFromModel, settingsStore, useSettingsValue } from "@/settings/model";
 import type { ModelSelectorEntry } from "@/components/ui/ModelSelector";
 import { lockedCopilotEntries, shouldPreviewCopilotModels } from "@/lib/lockedCopilotEntries";
+import { visibleCopilotPlusCatalog } from "@/vendorServices/vendorServicesPolicy";
 import { useAtomValue } from "jotai";
 import React from "react";
 
@@ -38,13 +39,14 @@ export function useChatModelPicker(params: {
   const { value, onChange, fallbackToFirst = true } = params;
   const entries = useAtomValue(chatBackendPickerAtom, { store: settingsStore });
   const settings = useSettingsValue();
+  const visibleCatalog = visibleCopilotPlusCatalog(settings);
 
   const lockedRows = React.useMemo(
     () =>
       shouldPreviewCopilotModels(settings.providers)
-        ? lockedCopilotEntries(settings.copilotPlusCatalog)
+        ? lockedCopilotEntries(visibleCatalog)
         : EMPTY_LOCKED_ROWS,
-    [settings.providers, settings.copilotPlusCatalog]
+    [settings.providers, visibleCatalog]
   );
 
   const { models, byModelKey, idToModelKey } = React.useMemo(() => {

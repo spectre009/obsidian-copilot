@@ -5,6 +5,7 @@ import { detectBinary } from "@/utils/detectBinary";
 import { setDisableBuiltinSystemPrompt } from "@/system-prompts/state";
 import { CODEX_QUESTION_CARD_STEERING, CodexBackend } from "./CodexBackend";
 import * as codexVersion from "./codexVersion";
+import { PLUS_ENV } from "@/builtinSkills/builtinSkills";
 
 jest.mock("@/utils/detectBinary", () => ({ detectBinary: jest.fn() }));
 
@@ -76,6 +77,7 @@ describe("CodexBackend", () => {
           .mockReset()
           .mockReturnValue("/npm/lib/node_modules/@agentclientprotocol/codex-acp/dist/index.js");
         resetSettings();
+        setSettings({ blockVendorServices: false });
         useCodexSettings({ binaryPath: "/usr/local/bin/codex-acp" });
       });
 
@@ -112,13 +114,44 @@ describe("CodexBackend", () => {
       });
 
       it("passes the plugin version to built-in Copilot Plus skills", async () => {
-        setSettings({ isPaidUser: true, plusLicenseKey: "plus-token", userId: "user-1" });
+        setSettings({
+          blockVendorServices: false,
+          isPaidUser: true,
+          plusLicenseKey: "plus-token",
+          userId: "user-1",
+        });
 
         const desc = await new CodexBackend("4.0.0-preview-260802").buildSpawnDescriptor({
           vaultBasePath: "/vault",
         });
 
         expect(desc.env.COPILOT_CLIENT_VERSION).toBe("4.0.0-preview-260802");
+      });
+
+      it("https://github.com/spectre009/obsidian-copilot/issues/1 removes managed, inherited, and override vendor variables while vendor services are blocked", async () => {
+        const previous = process.env[PLUS_ENV.userId];
+        process.env[PLUS_ENV.userId] = "inherited-user";
+        try {
+          setSettings({
+            blockVendorServices: true,
+            isPaidUser: true,
+            plusLicenseKey: "plus-token",
+            userId: "user-1",
+          });
+          useCodexSettings({
+            binaryPath: "/usr/local/bin/codex-acp",
+            envOverrides: { [PLUS_ENV.licenseKey]: "override-license" },
+          });
+
+          const desc = await new CodexBackend("4.0.15").buildSpawnDescriptor({
+            vaultBasePath: "/vault",
+          });
+
+          for (const key of Object.values(PLUS_ENV)) expect(desc.env).not.toHaveProperty(key);
+        } finally {
+          if (previous === undefined) delete process.env[PLUS_ENV.userId];
+          else process.env[PLUS_ENV.userId] = previous;
+        }
       });
 
       it("https://github.com/Brevilabs/obsidian-copilot-private/issues/618 starts Codex in the read-only mode that asks before workspace edits", async () => {

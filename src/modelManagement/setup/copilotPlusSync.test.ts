@@ -73,6 +73,7 @@ describe("copilotPlusSync", () => {
   beforeEach(() => {
     resetSettings();
     setSettings({
+      blockVendorServices: false,
       isPaidUser: false,
       plusLicenseKey: "",
       copilotPlusCatalog: { models: [], defaultEnabledIds: [] },
@@ -80,7 +81,7 @@ describe("copilotPlusSync", () => {
   });
 
   describe("plusSyncNeeded()", () => {
-    const base = { isPaidUser: true, plusLicenseKey: "key-1" };
+    const base = { isPaidUser: true, plusLicenseKey: "key-1", blockVendorServices: false };
 
     it("stays false when a signed-in user's Reset Settings preserves the paid state (https://github.com/logancyang/obsidian-copilot-preview/issues/259)", () => {
       expect(plusSyncNeeded(base, { ...base })).toBe(false);
@@ -95,10 +96,15 @@ describe("copilotPlusSync", () => {
       expect(plusSyncNeeded(base, { ...base, plusLicenseKey: "key-2" })).toBe(true);
       expect(
         plusSyncNeeded(
-          { isPaidUser: false, plusLicenseKey: "key-1" },
-          { isPaidUser: false, plusLicenseKey: "key-2" }
+          { ...base, isPaidUser: false, plusLicenseKey: "key-1" },
+          { ...base, isPaidUser: false, plusLicenseKey: "key-2" }
         )
       ).toBe(false);
+    });
+
+    it("fires when Block vendor services turns on or off, so the sync re-evaluates the provider (https://github.com/spectre009/obsidian-copilot/issues/1)", () => {
+      expect(plusSyncNeeded(base, { ...base, blockVendorServices: true })).toBe(true);
+      expect(plusSyncNeeded({ ...base, blockVendorServices: true }, base)).toBe(true);
     });
   });
 
@@ -442,6 +448,84 @@ describe("copilotPlusSync", () => {
         })
       ).resolves.toBeUndefined();
       expect(registerPlusProvider.mock.calls[0][0].models).toBeUndefined();
+    });
+
+    it.each([
+      ["a signed-in user", true, "token"],
+      ["an install with no license", false, ""],
+    ])(
+      "fetches nothing and neither registers nor unregisters for %s while vendor services are blocked (https://github.com/spectre009/obsidian-copilot/issues/1)",
+      async (_label, isPaidUser, licenseKey) => {
+        const { api, registerPlusProvider, unregisterPlusProvider } = makeApi();
+        setSettings({ blockVendorServices: true, isPaidUser, plusLicenseKey: licenseKey });
+        const fetchModels = jest.fn(async () => response());
+
+        await syncCopilotPlusProvider(api, isPaidUser, licenseKey, fetchModels);
+
+        expect(fetchModels).not.toHaveBeenCalled();
+        expect(registerPlusProvider).not.toHaveBeenCalled();
+        expect(unregisterPlusProvider).not.toHaveBeenCalled();
+      }
+    );
+
+    it("keeps the stored lineup intact while blocked, so unblocking restores it (https://github.com/spectre009/obsidian-copilot/issues/1)", async () => {
+      const { api } = makeApi();
+      const cached = {
+        models: [{ id: "cached-model", displayName: "Cached" }],
+        defaultEnabledIds: ["cached-model"],
+      };
+      setSettings({ blockVendorServices: true, copilotPlusCatalog: cached });
+
+      await syncCopilotPlusProvider(api, false, "", async () => response());
+
+      expect(getSettings().copilotPlusCatalog).toEqual(cached);
+    });
+
+    it("neither caches nor registers a lineup that arrives after blocking turned on mid-read (https://github.com/spectre009/obsidian-copilot/issues/1)", async () => {
+      const { api, registerPlusProvider } = makeApi();
+      signedIn();
+
+      await syncCopilotPlusProvider(api, true, "token", async () => {
+        setSettings({ blockVendorServices: true });
+        return response();
+      });
+
+      expect(getSettings().copilotPlusCatalog.models).toEqual([]);
+      expect(registerPlusProvider).not.toHaveBeenCalled();
+    });
+
+    it("abandons an unlicensed read still in flight when blocking turns on, and caches nothing it returns later (https://github.com/spectre009/obsidian-copilot/issues/1)", async () => {
+      const { api } = makeApi();
+      const pending = deferredRead();
+
+      const sync = syncCopilotPlusProvider(api, false, "", pending.read);
+      await flush();
+      setSettings({ blockVendorServices: true });
+      await sync;
+      pending.resolve(response());
+      await flush();
+
+      expect(getSettings().copilotPlusCatalog.models).toEqual([]);
+    });
+
+    it("drops a read abandoned by a quick block-then-unblock, keeping the cached lineup (https://github.com/spectre009/obsidian-copilot/issues/1)", async () => {
+      const { api } = makeApi();
+      const cached = {
+        models: [{ id: "cached-model", displayName: "Cached" }],
+        defaultEnabledIds: ["cached-model"],
+      };
+      setSettings({ copilotPlusCatalog: cached });
+      const pending = deferredRead();
+
+      const sync = syncCopilotPlusProvider(api, false, "", pending.read);
+      await flush();
+      setSettings({ blockVendorServices: true });
+      setSettings({ blockVendorServices: false });
+      await sync;
+      pending.resolve(response());
+      await flush();
+
+      expect(getSettings().copilotPlusCatalog).toEqual(cached);
     });
   });
 });

@@ -41,6 +41,7 @@ describe("AgentHomeReleaseUpdate", () => {
     beforeEach(() => {
       jest.clearAllMocks();
       jest.mocked(useSettingsValue).mockReturnValue({
+        blockVendorServices: false,
         lastDismissedVersion: null,
       } as ReturnType<typeof useSettingsValue>);
       jest.mocked(useLatestVersion).mockReturnValue({
@@ -106,6 +107,26 @@ describe("AgentHomeReleaseUpdate", () => {
       expect(
         screen.getByRole("link", { name: "Watch demo video: OpenCode 2" }).getAttribute("href")
       ).toBe("https://www.youtube.com/shorts/IjjXVFNFO0k");
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 shows no demo thumbnail while vendor services are blocked, so no release image loads", () => {
+      jest.mocked(useSettingsValue).mockReturnValue({
+        blockVendorServices: true,
+        lastDismissedVersion: null,
+      } as ReturnType<typeof useSettingsValue>);
+      jest.mocked(useLatestVersion).mockReturnValue({
+        hasUpdate: true,
+        latestRelease: {
+          ...RELEASE,
+          body: "[![Demo video: OpenCode 2](https://images.brevilabs.com/thumb.png)](https://www.youtube.com/shorts/IjjXVFNFO0k)",
+        },
+        latestVersion: RELEASE.version,
+      });
+
+      const { container } = renderUpdate();
+
+      expect(screen.queryByRole("link", { name: /Watch demo video/ })).toBeNull();
+      expect(container.querySelector("img")).toBeNull();
     });
   });
 });

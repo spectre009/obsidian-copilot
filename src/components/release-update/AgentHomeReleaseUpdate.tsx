@@ -4,6 +4,7 @@ import { findReleaseVideo } from "@/components/release-update/releaseNotes";
 import { useApp } from "@/context";
 import { useLatestVersion } from "@/hooks/useLatestVersion";
 import { updateSetting, useSettingsValue } from "@/settings/model";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
 import * as React from "react";
 
 interface AgentHomeReleaseUpdateProps {
@@ -17,7 +18,8 @@ export function AgentHomeReleaseUpdate({
 }: AgentHomeReleaseUpdateProps): React.ReactElement | null {
   const app = useApp();
   const { latestRelease, hasUpdate } = useLatestVersion(currentVersion);
-  const lastDismissedVersion = useSettingsValue().lastDismissedVersion;
+  const settings = useSettingsValue();
+  const lastDismissedVersion = settings.lastDismissedVersion;
 
   if (!visible || !hasUpdate || !latestRelease || lastDismissedVersion === latestRelease.version) {
     return null;
@@ -28,7 +30,7 @@ export function AgentHomeReleaseUpdate({
       onDismiss={() => updateSetting("lastDismissedVersion", latestRelease.version)}
       onOpen={() => new ReleaseNotesModal(app, latestRelease, currentVersion).open()}
       version={latestRelease.version}
-      video={findReleaseVideo(latestRelease.body)}
+      video={areVendorServicesBlocked(settings) ? null : findReleaseVideo(latestRelease.body)}
     />
   );
 }

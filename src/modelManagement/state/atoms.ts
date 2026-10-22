@@ -1,6 +1,7 @@
 import { atom } from "jotai";
 
 import { settingsAtom } from "@/settings/model";
+import { visibleCopilotPlusCatalog, visibleProviders } from "@/vendorServices/vendorServicesPolicy";
 
 import { providerNeedsSelfHostWarning } from "@/modelManagement/providers/selfHostPolicy";
 import type {
@@ -15,8 +16,10 @@ import type { EnabledBackendEntry } from "@/modelManagement/types/runtime";
 
 const EMPTY_PICKER_ENTRIES: readonly EnabledBackendEntry[] = Object.freeze([]);
 
-export const providersAtom = atom<Readonly<Record<string, Provider>>>(
-  (get) => get(settingsAtom).providers
+// Blocking hides the stored Plus provider and lineup from every view rather than deleting them.
+// https://github.com/spectre009/obsidian-copilot/issues/1
+export const providersAtom = atom<Readonly<Record<string, Provider>>>((get) =>
+  visibleProviders(get(settingsAtom))
 );
 
 export const configuredModelsAtom = atom<readonly ConfiguredModel[]>(
@@ -27,8 +30,8 @@ export const backendsAtom = atom<Readonly<Partial<Record<BackendType, BackendCon
   (get) => get(settingsAtom).backends
 );
 
-export const copilotPlusCatalogAtom = atom<Readonly<PersistedCopilotPlusCatalog>>(
-  (get) => get(settingsAtom).copilotPlusCatalog
+export const copilotPlusCatalogAtom = atom<Readonly<PersistedCopilotPlusCatalog>>((get) =>
+  visibleCopilotPlusCatalog(get(settingsAtom))
 );
 
 const selfHostModeAtom = atom<boolean>((get) => get(settingsAtom).enableSelfHostMode);

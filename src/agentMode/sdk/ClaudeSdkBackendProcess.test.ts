@@ -45,8 +45,13 @@ jest.mock("@/logger", () => ({
   logError: jest.fn(),
 }));
 
+let mockBlockVendorServices: boolean | undefined = false;
+
 jest.mock("@/settings/model", () => ({
-  getSettings: () => ({ agentMode: { debugFullFrames: false } }),
+  getSettings: () => ({
+    agentMode: { debugFullFrames: false },
+    blockVendorServices: mockBlockVendorServices,
+  }),
 }));
 
 jest.mock("@/agentMode/session/debugSink", () => ({
@@ -67,6 +72,7 @@ import {
 } from "./ClaudeSdkBackendProcess";
 import { getCachedSdkCatalog } from "./effortOption";
 import { AuthRequiredError } from "@/agentMode/session/errors";
+import { PLUS_ENV } from "@/builtinSkills/builtinSkills";
 
 beforeEach(() => {
   (getCachedSdkCatalog as jest.Mock).mockReturnValue(FAKE_CATALOG);
@@ -873,6 +879,49 @@ describe("ClaudeSdkBackendProcess", () => {
         await expect(
           proc.prompt({ sessionId, prompt: [{ type: "text", text: "hi" }] })
         ).rejects.toThrow(new Error(USAGE_LIMIT_MESSAGE));
+      });
+
+      describe("vendor environment", () => {
+        const inheritedKey = PLUS_ENV.licenseKey;
+        let previous: string | undefined;
+        beforeEach(() => {
+          previous = process.env[inheritedKey];
+          process.env[inheritedKey] = "inherited-license";
+        });
+        afterEach(() => {
+          mockBlockVendorServices = false;
+          if (previous === undefined) delete process.env[inheritedKey];
+          else process.env[inheritedKey] = previous;
+        });
+
+        it("leaves Claude on its inherited environment when there is nothing to add and vendor services are allowed", async () => {
+          queryMock.mockImplementation(() => makeQuery([resultMessage()]));
+          const proc = makeProc();
+          const { sessionId } = await proc.newSession({ cwd: "/vault" });
+
+          await proc.prompt({ sessionId, prompt: [{ type: "text", text: "hi" }] });
+
+          const options = (getPromptQueryCalls()[0][0] as { options: { env?: unknown } }).options;
+          expect(options.env).toBeUndefined();
+        });
+
+        it("https://github.com/spectre009/obsidian-copilot/issues/1 hands Claude a copy without inherited, managed, or override vendor variables while blocked", async () => {
+          mockBlockVendorServices = true;
+          queryMock.mockImplementation(() => makeQuery([resultMessage()]));
+          const proc = makeProc({
+            getManagedEnv: async () => ({ [PLUS_ENV.baseUrl]: "https://api.brevilabs.com/v1" }),
+            getEnvOverrides: () => ({ [PLUS_ENV.userId]: "override-user", KEEP: "yes" }),
+          });
+          const { sessionId } = await proc.newSession({ cwd: "/vault" });
+
+          await proc.prompt({ sessionId, prompt: [{ type: "text", text: "hi" }] });
+
+          const options = (
+            getPromptQueryCalls()[0][0] as { options: { env?: Record<string, string> } }
+          ).options;
+          expect(options.env?.KEEP).toBe("yes");
+          for (const key of Object.values(PLUS_ENV)) expect(options.env).not.toHaveProperty(key);
+        });
       });
 
       it("does not start a query when its session closes during environment preparation https://github.com/Brevilabs/obsidian-copilot-private/issues/429", async () => {

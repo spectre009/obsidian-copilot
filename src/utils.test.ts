@@ -20,6 +20,7 @@ import {
   withTimeout,
 } from "./utils";
 import { TimeoutError } from "./error";
+import { setSettings } from "@/settings/model";
 
 jest.mock("obsidian", () => {
   class MockTFile {
@@ -244,6 +245,18 @@ describe("utils", () => {
 
     beforeEach(() => {
       mockedRequestUrl.mockReset();
+      setSettings({ blockVendorServices: false });
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 reports no release and requests nothing while vendor services are blocked", async () => {
+      setSettings({ blockVendorServices: true });
+
+      await expect(checkLatestVersion()).resolves.toEqual({
+        version: null,
+        error: null,
+        release: null,
+      });
+      expect(mockedRequestUrl).not.toHaveBeenCalled();
     });
 
     const manifestUrl =
@@ -261,6 +274,20 @@ describe("utils", () => {
       html_url: "https://github.com/logancyang/obsidian-copilot/releases/tag/v4.0.4",
       assets: [{ name: "manifest.json", browser_download_url: manifestUrl }],
     };
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 skips the manifest download when blocking turns on while the release lookup is in flight", async () => {
+      mockedRequestUrl.mockImplementationOnce(() => {
+        setSettings({ blockVendorServices: true });
+        return Promise.resolve(response(releaseResponse)) as ReturnType<typeof Obsidian.requestUrl>;
+      });
+
+      await expect(checkLatestVersion()).resolves.toEqual({
+        version: null,
+        error: null,
+        release: null,
+      });
+      expect(mockedRequestUrl).toHaveBeenCalledTimes(1);
+    });
 
     it(`returns release notes with the manifest version even when the tag differs for ${issueUrl}`, async () => {
       mockedRequestUrl

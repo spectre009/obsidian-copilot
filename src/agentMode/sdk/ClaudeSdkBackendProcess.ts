@@ -46,6 +46,8 @@ import type {
 import type { ProjectScopeId } from "@/agentMode/session/scope";
 import { AuthRequiredError, MethodUnsupportedError } from "@/agentMode/session/errors";
 import { requireNodeModule } from "@/utils/desktopRuntime";
+import { getSettings } from "@/settings/model";
+import { areVendorServicesBlocked, withoutVendorEnv } from "@/vendorServices/vendorServicesPolicy";
 import { createClaudeTaskPlanState, type ClaudeTaskPlanState } from "./claudeTodoPlan";
 import { ClaudeBackgroundTaskStateMachine } from "./claudeTaskProtocol";
 import {
@@ -329,8 +331,11 @@ export class ClaudeSdkBackendProcess implements BackendProcess {
     const envOverrides = this.opts.getEnvOverrides?.();
     const managedEnv = (await this.opts.getManagedEnv?.()) ?? {};
     const extraEnv = { ...managedEnv, ...envOverrides };
-    if (Object.keys(extraEnv).length > 0) {
-      options.env = { ...process.env, ...extraEnv };
+    const settings = getSettings();
+    // An inherited or overridden license variable would still reach vendor relay skills, so a
+    // blocked install always hands Claude a scrubbed copy. https://github.com/spectre009/obsidian-copilot/issues/1
+    if (Object.keys(extraEnv).length > 0 || areVendorServicesBlocked(settings)) {
+      options.env = withoutVendorEnv({ ...process.env, ...extraEnv }, settings);
     }
 
     options.hooks = { PreToolUse: [{ hooks: [enforceForegroundToolUse] }] };

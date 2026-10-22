@@ -1,6 +1,8 @@
 import { logWarn } from "@/logger";
 import type { LatestRelease } from "@/utils";
 import { compareSemver } from "@/utils/semver";
+import { getSettings } from "@/settings/model";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
 import { requestUrl } from "obsidian";
 
 const GITHUB_REFERENCE_URL =
@@ -59,6 +61,9 @@ export async function requestReleaseNotesSince(
     // Prereleases can fill whole pages, so keep paging until enough stable notes are found.
     // https://github.com/Brevilabs/obsidian-copilot-private/issues/600
     for (let page = 1; skipped.length < MAX_RELEASE_NOTES - 1; page++) {
+      // Each page is a new request, so a block that lands mid-history stops the paging.
+      // https://github.com/spectre009/obsidian-copilot/issues/1
+      if (areVendorServicesBlocked(getSettings())) return [latest];
       const response = await requestUrl({ url: `${RELEASES_API_URL}&page=${page}`, method: "GET" });
       const items: GitHubReleaseListItem[] = Array.isArray(response.json) ? response.json : [];
       let reachedInstalled = false;

@@ -93,6 +93,7 @@ export interface CopilotSettings {
   enableAutonomousAgent: boolean;
   enableCustomPromptTemplating: boolean;
   enableSelfHostMode: boolean;
+  blockVendorServices: boolean;
   enableMiyo: boolean;
   enableMiyoSearchSkill: boolean;
   miyoSearchAll: boolean;
@@ -548,6 +549,12 @@ export function sanitizeSettings(settings: CopilotSettings): CopilotSettings {
     sanitizedSettings.lexicalSearchRamLimit = DEFAULT_SETTINGS.lexicalSearchRamLimit;
   } else {
     sanitizedSettings.lexicalSearchRamLimit = Math.min(1000, Math.max(20, lexicalSearchRamLimit));
+  }
+
+  // A missing or corrupt value blocks, so no upgrade or bad write silently reopens vendor egress.
+  // https://github.com/spectre009/obsidian-copilot/issues/1
+  if (typeof sanitizedSettings.blockVendorServices !== "boolean") {
+    sanitizedSettings.blockVendorServices = true;
   }
 
   if (typeof sanitizedSettings.enableMiyo !== "boolean") {

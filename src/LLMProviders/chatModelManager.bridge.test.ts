@@ -5,6 +5,9 @@ import { getSettings, setSettings } from "@/settings/model";
 import * as obsidianModule from "obsidian";
 
 import ChatModelManager from "./chatModelManager";
+import { VendorServicesBlockedError } from "@/vendorServices/vendorServicesPolicy";
+
+const BLOCK_ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/1";
 
 jest.mock("@langchain/anthropic", () => {
   class ChatAnthropic {
@@ -58,11 +61,67 @@ describe("chatModelManager", () => {
   describe("ChatModelManager", () => {
     const originalOpenAiKey = getSettings().openAIApiKey;
 
+    beforeEach(() => {
+      setSettings({ blockVendorServices: false });
+    });
+
     afterEach(() => {
       setSettings({ openAIApiKey: originalOpenAiKey });
     });
 
     describe("createModelInstanceFromBridged()", () => {
+      const OpenRouterMock = () =>
+        jest.requireMock("./ChatOpenRouter").ChatOpenRouter as {
+          configs: Array<{
+            configuration?: { fetch?: (url: string, init?: RequestInit) => Promise<Response> };
+          }>;
+        };
+
+      it(`${BLOCK_ISSUE} refuses to build a Copilot Plus model while vendor services are blocked`, async () => {
+        setSettings({ blockVendorServices: true });
+        const built = OpenRouterMock().configs.length;
+
+        await expect(
+          ChatModelManager.getInstance().createModelInstanceFromBridged(
+            bridgedModel({ provider: ChatModelProviders.COPILOT_PLUS, apiKey: "bridge-key" })
+          )
+        ).rejects.toBeInstanceOf(VendorServicesBlockedError);
+        expect(OpenRouterMock().configs).toHaveLength(built);
+      });
+
+      it(`${BLOCK_ISSUE} refuses to build a hand-added model whose endpoint is a vendor host while blocked`, async () => {
+        setSettings({ blockVendorServices: true });
+
+        await expect(
+          ChatModelManager.getInstance().createModelInstanceFromBridged(
+            bridgedModel({
+              provider: ChatModelProviders.OPENAI_FORMAT,
+              apiKey: "key",
+              baseUrl: "https://models.brevilabs.com/v1",
+            })
+          )
+        ).rejects.toBeInstanceOf(VendorServicesBlockedError);
+      });
+
+      it(`${BLOCK_ISSUE} stops a Copilot Plus model built while allowed from sending once blocking turns on`, async () => {
+        const requestUrl = jest.fn().mockResolvedValue({ status: 200, text: "{}", headers: {} });
+        (
+          obsidianModule as unknown as { __setRequestUrlImpl: (impl: unknown) => void }
+        ).__setRequestUrlImpl(requestUrl);
+        await ChatModelManager.getInstance().createModelInstanceFromBridged(
+          bridgedModel({ provider: ChatModelProviders.COPILOT_PLUS, apiKey: "bridge-key" })
+        );
+        const transport = OpenRouterMock().configs.at(-1)?.configuration?.fetch;
+        expect(transport).toBeDefined();
+
+        setSettings({ blockVendorServices: true });
+
+        await expect(
+          transport!("https://models.brevilabs.com/v1/chat/completions", { method: "POST" })
+        ).rejects.toBeInstanceOf(VendorServicesBlockedError);
+        expect(requestUrl).not.toHaveBeenCalled();
+      });
+
       it("does not fall back to a legacy top-level provider key", async () => {
         setSettings({ openAIApiKey: "legacy-key" });
 

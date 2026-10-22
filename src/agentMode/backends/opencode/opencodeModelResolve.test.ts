@@ -39,8 +39,10 @@ function makeSettings(args: {
   configuredModels?: ConfiguredModel[];
   providers?: Record<string, Provider>;
   enableSelfHostMode?: boolean;
+  blockVendorServices?: boolean;
 }): CopilotSettings {
   return {
+    blockVendorServices: args.blockVendorServices ?? false,
     backends:
       args.enabledModels === undefined ? {} : { opencode: { enabledModels: args.enabledModels } },
     configuredModels: args.configuredModels ?? [],
@@ -86,6 +88,34 @@ describe("opencodeModelResolve", () => {
       requiresApiKey: true,
       apiKeyKeychainId: "kc-1",
       ...overrides,
+    });
+
+    it("offers an enabled Copilot Plus model under its reserved opencode route while vendor services are allowed", () => {
+      const settings = makeSettings({
+        enabledModels: ["plus-m"],
+        providers: { plus: makeProvider("plus", { kind: "copilot-plus" }, "openai-compatible") },
+        configuredModels: [makeModel("plus-m", "plus", "glm-5.2")],
+      });
+
+      expect(opencodeEnabledModelEntries(settings).map((e) => e.baseModelId)).toEqual([
+        "copilot-plus/glm-5.2",
+      ]);
+    });
+
+    it("offers no Copilot Plus model while vendor services are blocked, keeping other enabled models — https://github.com/spectre009/obsidian-copilot/issues/1", () => {
+      const settings = makeSettings({
+        blockVendorServices: true,
+        enabledModels: ["plus-m", "cm1"],
+        providers: {
+          plus: makeProvider("plus", { kind: "copilot-plus" }, "openai-compatible"),
+          p1: byokProvider(),
+        },
+        configuredModels: [makeModel("plus-m", "plus", "glm-5.2"), makeModel("cm1", "p1", "x")],
+      });
+
+      expect(opencodeEnabledModelEntries(settings).map((e) => e.baseModelId)).toEqual([
+        "openrouter/x",
+      ]);
     });
 
     it("flags a required-key provider with no key as missing_key", () => {

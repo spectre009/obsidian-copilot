@@ -2,6 +2,7 @@ import { logError, logInfo, logWarn } from "@/logger";
 import type { MiyoHealthResponse } from "@/miyo/miyoHealth";
 import { MiyoServiceDiscovery } from "@/miyo/MiyoServiceDiscovery";
 import { type CopilotSettings, getSettings } from "@/settings/model";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
 import { err2String, withTimeout } from "@/utils";
 import { requestUrl } from "obsidian";
 
@@ -149,6 +150,15 @@ export interface MiyoSearchFilter {
   containsAny?: string[];
 }
 
+// Headers captured before an await must not carry the license once blocking has turned on.
+// https://github.com/spectre009/obsidian-copilot/issues/1
+function withoutLicenseIfBlocked(headers: Record<string, string>): Record<string, string> {
+  if (!areVendorServicesBlocked(getSettings())) return headers;
+  const withoutLicense = { ...headers };
+  delete withoutLicense.Authorization;
+  return withoutLicense;
+}
+
 export class MiyoClient {
   private static readonly HEALTH_TIMEOUT_MS = 8000;
 
@@ -250,7 +260,7 @@ export class MiyoClient {
               requestUrl({
                 url: url.toString(),
                 method: "GET",
-                headers,
+                headers: withoutLicenseIfBlocked(headers),
                 throw: false,
               }),
             8000,
@@ -463,7 +473,9 @@ export class MiyoClient {
     const headers: Record<string, string> = {};
 
     const licenseKey = settings.plusLicenseKey;
-    if (licenseKey) {
+    // The snapshot pins the server, not the policy, so blocking applies to requests already queued.
+    // https://github.com/spectre009/obsidian-copilot/issues/1
+    if (licenseKey && !areVendorServicesBlocked(getSettings())) {
       headers.Authorization = `Bearer ${licenseKey}`;
     }
 

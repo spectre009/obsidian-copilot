@@ -2,7 +2,7 @@ import { logInfo, logError } from "@/logger";
 import { MiyoClient, MiyoRequestError, type MiyoSearchResult } from "@/miyo/MiyoClient";
 import { MiyoServiceDiscovery } from "@/miyo/MiyoServiceDiscovery";
 import { getSettings } from "@/settings/model";
-import { requestUrl, type RequestUrlResponse } from "obsidian";
+import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from "obsidian";
 import type { CopilotSettings } from "@/settings/model";
 
 jest.mock("obsidian", () => ({
@@ -39,6 +39,7 @@ describe("MiyoClient", () => {
     jest.clearAllMocks();
     mockedRequestUrl.mockReset();
     mockedGetSettings.mockReturnValue({
+      blockVendorServices: false,
       plusLicenseKey: "plus-test-license",
       debug: false,
     } as CopilotSettings);
@@ -659,6 +660,7 @@ describe("MiyoClient", () => {
       const client = new MiyoClient({ plusLicenseKey: "key-of-the-vault-that-asked" });
 
       mockedGetSettings.mockReturnValue({
+        blockVendorServices: false,
         plusLicenseKey: "key-of-a-different-vault",
         debug: false,
       } as CopilotSettings);
@@ -669,6 +671,24 @@ describe("MiyoClient", () => {
           headers: { Authorization: "Bearer key-of-the-vault-that-asked" },
         })
       );
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 sends no license header once vendor services are blocked, even for a client built with a snapshot", async () => {
+      mockedRequestUrl.mockResolvedValue({
+        status: 201,
+        json: { path: "/Users/me/vault" },
+        text: "",
+      } as RequestUrlResponse);
+      const client = new MiyoClient({ plusLicenseKey: "key-of-the-vault-that-asked" });
+
+      mockedGetSettings.mockReturnValue({
+        blockVendorServices: true,
+        plusLicenseKey: "key-of-the-vault-that-asked",
+        debug: false,
+      } as CopilotSettings);
+      await client.addFolder({ path: "/Users/me/vault" });
+
+      expect((mockedRequestUrl.mock.calls[0][0] as RequestUrlParam).headers).toEqual({});
     });
 
     it("reads the live key when given no snapshot, as short-lived callers expect", async () => {
@@ -731,6 +751,7 @@ describe("MiyoClient", () => {
       mockedRequestUrl
         .mockImplementationOnce(() => {
           mockedGetSettings.mockReturnValue({
+            blockVendorServices: false,
             plusLicenseKey: "changed-license",
             debug: false,
           } as CopilotSettings);
@@ -755,6 +776,34 @@ describe("MiyoClient", () => {
         headers: { Authorization: "Bearer plus-test-license" },
         throw: false,
       });
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 verifies a 409 without the license header when blocking turned on during the add request", async () => {
+      mockedRequestUrl
+        .mockImplementationOnce(() => {
+          mockedGetSettings.mockReturnValue({
+            blockVendorServices: true,
+            plusLicenseKey: "plus-test-license",
+            debug: false,
+          } as CopilotSettings);
+          return Promise.resolve({
+            status: 409,
+            json: { detail: "Folder already registered" },
+            text: "",
+          } as RequestUrlResponse) as ReturnType<typeof requestUrl>;
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          json: { path: "/canonical/vault", allow_writes: false },
+          text: "",
+        } as RequestUrlResponse);
+
+      await new MiyoClient().addFolder({ path: "/Users/me/vault" });
+
+      expect((mockedRequestUrl.mock.calls[0][0] as RequestUrlParam).headers).toHaveProperty(
+        "Authorization"
+      );
+      expect((mockedRequestUrl.mock.calls[1][0] as RequestUrlParam).headers).toEqual({});
     });
 
     it.each([

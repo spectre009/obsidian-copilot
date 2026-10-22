@@ -16,18 +16,24 @@ import {
   subscribeToSettingsChange,
   type CopilotSettings,
 } from "@/settings/model";
+import {
+  areVendorServicesBlocked,
+  vendorServicesTransition,
+} from "@/vendorServices/vendorServicesPolicy";
 
 export type CopilotPlusModelsFetcher = () => Promise<BrevilabsModelsResponse | null>;
 
-// This predicate staying false on Reset Settings keeps the destructive `unregisterPlusProvider` cascade from firing:
-// https://github.com/logancyang/obsidian-copilot-preview/issues/259
+// Reset Settings must not reach the destructive `unregisterPlusProvider` cascade: it preserves the
+// paid fields compared here (https://github.com/logancyang/obsidian-copilot-preview/issues/259), and
+// the block it may restore makes the sync a no-op (https://github.com/spectre009/obsidian-copilot/issues/1).
 export function plusSyncNeeded(
-  prev: Pick<CopilotSettings, "isPaidUser" | "plusLicenseKey">,
-  next: Pick<CopilotSettings, "isPaidUser" | "plusLicenseKey">
+  prev: Pick<CopilotSettings, "isPaidUser" | "plusLicenseKey" | "blockVendorServices">,
+  next: Pick<CopilotSettings, "isPaidUser" | "plusLicenseKey" | "blockVendorServices">
 ): boolean {
   return (
     prev.isPaidUser !== next.isPaidUser ||
-    (!!next.isPaidUser && prev.plusLicenseKey !== next.plusLicenseKey)
+    (!!next.isPaidUser && prev.plusLicenseKey !== next.plusLicenseKey) ||
+    vendorServicesTransition(prev, next) !== null
   );
 }
 
@@ -84,6 +90,9 @@ async function refreshCachedLineup(
     logInfo("[modelManagement] Copilot Plus lineup unreadable; keeping the cached one");
     return null;
   }
+  // A read that completes after blocking turned on must not refresh the stored lineup.
+  // https://github.com/spectre009/obsidian-copilot/issues/1
+  if (areVendorServicesBlocked(getSettings())) return null;
   const cached = getSettings().copilotPlusCatalog;
   const same =
     JSON.stringify([cached.models, cached.defaultEnabledIds]) ===
@@ -106,6 +115,9 @@ export async function syncCopilotPlusProvider(
   fetchModels: CopilotPlusModelsFetcher = () => BrevilabsClient.getInstance().getModels()
 ): Promise<void> {
   try {
+    // Blocking suspends the Plus provider and its cached lineup instead of unregistering them, so
+    // turning the switch back off restores both. https://github.com/spectre009/obsidian-copilot/issues/1
+    if (areVendorServicesBlocked(getSettings())) return;
     if (!isPaidUser || !licenseKey) {
       await api.setup.copilotPlus.unregisterPlusProvider();
       // The locked "Copilot license required" rows render from the same cache,
@@ -118,13 +130,17 @@ export async function syncCopilotPlusProvider(
       // https://github.com/Brevilabs/obsidian-copilot-private/issues/476
       await refreshCachedLineup(fetchModels, () => {
         const now = getSettings();
-        return !now.isPaidUser || !now.plusLicenseKey;
+        return !areVendorServicesBlocked(now) && (!now.isPaidUser || !now.plusLicenseKey);
       });
       return;
     }
     const plusStateUnchanged = (): boolean => {
       const now = getSettings();
-      return now.isPaidUser === true && now.plusLicenseKey === licenseKey;
+      return (
+        !areVendorServicesBlocked(now) &&
+        now.isPaidUser === true &&
+        now.plusLicenseKey === licenseKey
+      );
     };
     const catalog = await refreshCachedLineup(fetchModels, plusStateUnchanged);
     // A sign-out, key rotation, or plugin reload can land during the read;

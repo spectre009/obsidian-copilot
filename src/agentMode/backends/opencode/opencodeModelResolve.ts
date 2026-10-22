@@ -7,6 +7,7 @@ import {
   providerRequiresApiKey,
 } from "@/modelManagement";
 import type { EnabledModelCredentialState, EnabledModelEntry } from "@/agentMode/session/types";
+import { visibleProviders } from "@/vendorServices/vendorServicesPolicy";
 
 export interface OpencodeProviderMapping {
   id: string;
@@ -78,11 +79,14 @@ export function opencodeEnabledModelEntries(
     modelsById.set(model.configuredModelId, model);
   }
 
+  // A blocked install never offers a Copilot Plus model, so a chat cannot start a turn on one.
+  // https://github.com/spectre009/obsidian-copilot/issues/1
+  const providers = visibleProviders(settings);
   const out: EnabledModelEntry[] = [];
   for (const configuredModelId of enabledIds) {
     const configuredModel = modelsById.get(configuredModelId);
     if (!configuredModel) continue;
-    const provider = settings.providers[configuredModel.providerId];
+    const provider = providers[configuredModel.providerId];
     if (!provider) continue;
     const mapping = mapProviderToOpencodeId(provider);
     if (!mapping) continue;

@@ -37,7 +37,7 @@ export interface ReportIssueFlowProps {
   initialNote?: string;
   sources: ReportSourceOption[];
   prepare: (note: string, selected: ReadonlySet<ReportSourceId>) => Promise<PreparedReport>;
-  upload: (report: PreparedReport) => Promise<UploadOutcome>;
+  upload?: (report: PreparedReport) => Promise<UploadOutcome>;
   discardReport: (report: PreparedReport) => Promise<void>;
   onCancel: () => void;
   onUploaded: (outcome: { reportId: string; issueUrl: string }) => void;
@@ -109,6 +109,7 @@ export function ReportIssueFlow(props: ReportIssueFlowProps) {
             })
           }
           error={error}
+          uploadsEnabled={props.upload !== undefined}
           onCancel={props.onCancel}
           onSubmit={() => void handlePrepare()}
         />
@@ -133,6 +134,7 @@ interface DetailsPageProps {
   selected: ReadonlySet<ReportSourceId>;
   onToggle: (id: ReportSourceId, checked: boolean) => void;
   error: string | null;
+  uploadsEnabled: boolean;
   onCancel: () => void;
   onSubmit: () => void;
 }
@@ -144,6 +146,7 @@ function DetailsPage({
   selected,
   onToggle,
   error,
+  uploadsEnabled,
   onCancel,
   onSubmit,
 }: DetailsPageProps) {
@@ -185,11 +188,18 @@ function DetailsPage({
         ))}
       </div>
 
-      <Callout tone="warning" title="Before you upload">
-        Copilot redacts common sensitive data from diagnostic text on your device before upload.
-        Review it before sending; screenshots are not automatically redacted. Reports are private
-        and deleted after 60 days.
-      </Callout>
+      {uploadsEnabled ? (
+        <Callout tone="warning" title="Before you upload">
+          Copilot redacts common sensitive data from diagnostic text on your device before upload.
+          Review it before sending; screenshots are not automatically redacted. Reports are private
+          and deleted after 60 days.
+        </Callout>
+      ) : (
+        <Callout tone="warning" title="Uploads are turned off">
+          Block vendor services is on, so Copilot only builds the zip on your device. Review it
+          before attaching it to an issue yourself; screenshots are not automatically redacted.
+        </Callout>
+      )}
 
       <div className="tw-flex tw-justify-end tw-gap-2">
         <Button variant="secondary" onClick={onCancel}>
@@ -238,7 +248,7 @@ function ManifestRow({ tone, icon: Icon, name, size, note, ...liProps }: Manifes
 
 interface ReviewPageProps {
   report: PreparedReport | null;
-  upload: (report: PreparedReport) => Promise<UploadOutcome>;
+  upload?: (report: PreparedReport) => Promise<UploadOutcome>;
   onUploaded: (outcome: { reportId: string; issueUrl: string }) => void;
   openIssuePage: (url: string) => void;
   revealFile: (path: string) => void;
@@ -260,9 +270,12 @@ function ReviewPage({
   const uploading = uploadState === "uploading";
   const failure = typeof uploadState === "object" ? uploadState.failed : null;
 
-  const runUpload = async (packed: PreparedReport) => {
+  const runUpload = async (
+    packed: PreparedReport,
+    send: (report: PreparedReport) => Promise<UploadOutcome>
+  ) => {
     setUploadState("uploading");
-    const outcome = await upload(packed);
+    const outcome = await send(packed);
     // The upload cannot be aborted, so its result can land after the user
     // dismissed the dialog. A browser tab opening then would be a surprise,
     // and there is no tree left to write a failure into
@@ -333,21 +346,33 @@ function ReviewPage({
           >
             Show zip
           </Button>
-          {failure !== null && (
+          {upload ? (
+            <>
+              {failure !== null && (
+                <Button
+                  variant="secondary"
+                  onClick={() => report && openIssuePage(report.manualIssueUrl)}
+                >
+                  Open issue anyway
+                </Button>
+              )}
+              <Button
+                variant="default"
+                disabled={report === null}
+                onClick={() => report && void runUpload(report, upload)}
+              >
+                {failure !== null ? "Retry upload" : "Upload & open issue"}
+              </Button>
+            </>
+          ) : (
             <Button
-              variant="secondary"
+              variant="default"
+              disabled={report === null}
               onClick={() => report && openIssuePage(report.manualIssueUrl)}
             >
-              Open issue anyway
+              Open issue
             </Button>
           )}
-          <Button
-            variant="default"
-            disabled={report === null}
-            onClick={() => report && void runUpload(report)}
-          >
-            {failure !== null ? "Retry upload" : "Upload & open issue"}
-          </Button>
         </div>
       )}
     </>

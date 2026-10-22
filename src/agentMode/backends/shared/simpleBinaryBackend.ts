@@ -4,6 +4,8 @@ import { AcpBackendProcess } from "@/agentMode/acp/AcpBackendProcess";
 import type { AcpBackend, AcpSpawnDescriptor } from "@/agentMode/acp/types";
 import { augmentPathForNodeShebang } from "@/agentMode/acp/nodeShebangPath";
 import type { BackendDescriptor, BackendProcess } from "@/agentMode/session/types";
+import { getSettings } from "@/settings/model";
+import { withoutVendorEnv } from "@/vendorServices/vendorServicesPolicy";
 
 export function buildSimpleSpawnDescriptor(
   binaryPath: string | undefined,
@@ -15,12 +17,15 @@ export function buildSimpleSpawnDescriptor(
   return {
     command: binaryPath,
     args: [],
-    env: {
-      ...process.env,
-      PATH: augmentPathForNodeShebang(binaryPath, process.env.PATH),
-      ...(managedEnv ?? {}),
-      ...(envOverrides ?? {}),
-    },
+    env: withoutVendorEnv(
+      {
+        ...process.env,
+        PATH: augmentPathForNodeShebang(binaryPath, process.env.PATH),
+        ...(managedEnv ?? {}),
+        ...(envOverrides ?? {}),
+      },
+      getSettings()
+    ),
   };
 }
 

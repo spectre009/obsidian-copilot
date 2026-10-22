@@ -66,6 +66,7 @@ describe("agentSystemPrompt", () => {
   describe("buildAgentSystemPrompt()", () => {
     beforeEach(() => {
       resetSettings();
+      updateSetting("blockVendorServices", false);
       updateSetting("enableMiyoDocumentProcessing", false);
       resetPromptState();
       mockIsObsidianCliEnabled.mockReturnValue(true);
@@ -188,6 +189,17 @@ describe("agentSystemPrompt", () => {
       const nonPlus = buildAgentSystemPrompt(AGENT);
       updateSetting("isPaidUser", true);
       expect(buildAgentSystemPrompt(AGENT)).toBe(nonPlus);
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 steers no agent to a Copilot relay skill while vendor services are blocked", () => {
+      setBuiltinPreferences({});
+      updateSetting("blockVendorServices", true);
+
+      for (const agent of ["claude", "codex", "opencode"]) {
+        const prompt = buildAgentSystemPrompt(agent);
+        expect(prompt).not.toContain("Run these Copilot skills before any built-in web tool");
+        expect(prompt).not.toContain("copilot-fetch-x");
+      }
     });
 
     it("omits web search and web fetch skills under default settings https://github.com/Brevilabs/obsidian-copilot-private/issues/629", () => {

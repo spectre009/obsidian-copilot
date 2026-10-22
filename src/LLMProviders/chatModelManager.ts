@@ -24,6 +24,7 @@ import { MissingApiKeyError, MissingPlusLicenseError } from "@/error";
 import { ChatOpenRouter } from "./ChatOpenRouter";
 import { ChatLMStudio } from "./ChatLMStudio";
 import { BrevilabsClient } from "./brevilabsClient";
+import { assertVendorServicesAllowed, isVendorUrl } from "@/vendorServices/vendorServicesPolicy";
 import type { SafetySetting } from "@google/generative-ai";
 
 const GOOGLE_SAFETY_SETTINGS_BLOCK_NONE: SafetySetting[] = [
@@ -42,6 +43,13 @@ const GOOGLE_SAFETY_SETTINGS_BLOCK_NONE: SafetySetting[] = [
       : content.map((item: { type: string; text?: string }): string => item.text ?? "").join("");
   return Math.ceil(text.length / 4);
 };
+
+// Checked per request rather than at construction, so a model built before blocking turned on
+// sends nothing afterwards. https://github.com/spectre009/obsidian-copilot/issues/1
+async function fetchCopilotPlus(url: string, options?: RequestInit): Promise<Response> {
+  assertVendorServicesAllowed(getSettings());
+  return safeFetchNoThrow(url, options);
+}
 
 type ChatConstructorType = {
   new (config: Record<string, unknown>): BaseChatModel;
@@ -266,7 +274,7 @@ export default class ChatModelManager {
         apiKey: customModel.apiKey || "",
         configuration: {
           baseURL: BREVILABS_MODELS_BASE_URL,
-          fetch: safeFetchNoThrow,
+          fetch: fetchCopilotPlus,
           defaultHeaders: BrevilabsClient.getInstance().getPluginVersionHeaders(),
         },
         enableReasoning:
@@ -410,6 +418,12 @@ export default class ChatModelManager {
   }
 
   async createModelInstanceFromBridged(model: CustomModel): Promise<BaseChatModel> {
+    if (
+      (model.provider as ChatModelProviders) === ChatModelProviders.COPILOT_PLUS ||
+      (model.baseUrl && isVendorUrl(model.baseUrl))
+    ) {
+      assertVendorServicesAllowed(getSettings());
+    }
     if (!this.hasProviderCredentials(model, false)) {
       if ((model.provider as ChatModelProviders) === ChatModelProviders.COPILOT_PLUS) {
         throw new MissingPlusLicenseError(

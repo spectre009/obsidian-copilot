@@ -18,6 +18,10 @@ import { captureWindowBehindDialogs } from "./reportScreenshot";
 import { getSettings } from "@/settings/model";
 import { getPersistedDeviceId } from "@/utils/deviceId";
 import { createReportUploader } from "@/utils/reportUpload.brevilabs";
+import {
+  areVendorServicesBlocked,
+  VENDOR_SERVICES_BLOCKED_MESSAGE,
+} from "@/vendorServices/vendorServicesPolicy";
 import { App, ItemView, Modal, Notice, Plugin, apiVersion } from "obsidian";
 import React from "react";
 import { Root } from "react-dom/client";
@@ -39,7 +43,7 @@ export interface ReportIssueModalParams {
   app: App;
   activeBackend: string;
   pluginVersion: string;
-  uploader: ReportUploader;
+  uploader?: ReportUploader;
   initialNote?: string;
   preselectAllSources?: boolean;
   onReported?: (report: { reportId: string; issueUrl: string }) => void;
@@ -59,10 +63,14 @@ export function openReportIssueModal(
     ...options,
     app,
     pluginVersion: manifest.version,
-    uploader: createReportUploader({
-      installId: () => getPersistedDeviceId(app),
-      clientVersion: manifest.version,
-    }),
+    // A blocked install offers only the manual issue path, so report contents never reach the
+    // vendor upload endpoint. https://github.com/spectre009/obsidian-copilot/issues/1
+    uploader: areVendorServicesBlocked(getSettings())
+      ? undefined
+      : createReportUploader({
+          installId: () => getPersistedDeviceId(app),
+          clientVersion: manifest.version,
+        }),
   });
   modal.open();
   return modal;
@@ -159,7 +167,7 @@ export class ReportIssueModal extends Modal {
         initialNote={this.params.initialNote}
         sources={this.buildSources()}
         prepare={(note, selected) => this.prepare(note, selected)}
-        upload={(report) => this.upload(report)}
+        upload={this.params.uploader && ((report) => this.upload(report))}
         discardReport={(report) => this.discard(report)}
         onCancel={() => this.close()}
         onUploaded={(outcome) => void this.onUploaded(outcome)}
@@ -297,6 +305,7 @@ export class ReportIssueModal extends Modal {
   }
 
   private async upload(report: PreparedReport): Promise<UploadOutcome> {
+    if (!this.params.uploader) return { ok: false, error: VENDOR_SERVICES_BLOCKED_MESSAGE };
     this.uploading = true;
     const outcome = await uploadReport(this.params.uploader, report);
     this.uploading = false;

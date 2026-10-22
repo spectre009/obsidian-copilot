@@ -7,6 +7,7 @@ import { SettingSwitch } from "@/components/ui/setting-switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { navigateToPlusPage, useIsPaidUser } from "@/plusUtils";
 import { updateSetting, useSettingsValue } from "@/settings/model";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
 import { DropdownMenu, DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu";
 import { CheckCircle, Download, History, MessageCirclePlus, MoreHorizontal } from "lucide-react";
 import React from "react";
@@ -55,6 +56,7 @@ export function ChatControls({
         <ChatModeSelector
           selectedChain={selectedChain}
           isPaidUser={Boolean(isPaidUser)}
+          plusModeHidden={areVendorServicesBlocked(settings)}
           onModeChange={handleModeChange}
           onPlusUpsell={() => navigateToPlusPage("chat_mode_select")}
         />

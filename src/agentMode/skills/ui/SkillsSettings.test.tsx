@@ -15,6 +15,7 @@ import React from "react";
 import type CopilotPlugin from "@/main";
 import type { SkillLoadIssue } from "./SkillLoadIssues";
 import { SkillsSettings } from "./SkillsSettings";
+import { VENDOR_SKILL_BLOCKED_REASON } from "@/builtinSkills/builtinSkills";
 
 const setBuiltinSkillEnabled = jest.fn().mockResolvedValue({ ok: true });
 const setBuiltinAgentEnabled = jest.fn().mockResolvedValue({ ok: true });
@@ -108,8 +109,37 @@ describe("SkillsSettings", () => {
       mockRejectedSkills = [];
       mockCapturedLoadIssues = [];
       mockCapturedFixAll = () => undefined;
-      settingsStore.set(settingsAtom, { ...DEFAULT_SETTINGS, copilotFolder: "copilot" });
+      settingsStore.set(settingsAtom, {
+        ...DEFAULT_SETTINGS,
+        blockVendorServices: false,
+        copilotFolder: "copilot",
+      });
       jest.mocked(isObsidianCliEnabled).mockReturnValue(true);
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 locks the vendor skills with the vendor-services reason while blocked, leaving Obsidian skills usable", async () => {
+      settingsStore.set(settingsAtom, {
+        ...DEFAULT_SETTINGS,
+        blockVendorServices: true,
+        copilotFolder: "copilot",
+      });
+      mockAgents = [{ id: "opencode", displayName: "OpenCode", Icon: Bot }];
+      mockInstallStates = { opencode: { kind: "ready", source: "managed" } };
+      await act(async () => {
+        renderSettings();
+      });
+
+      expect(screen.getAllByLabelText(VENDOR_SKILL_BLOCKED_REASON).length).toBeGreaterThan(0);
+      expect(
+        screen
+          .getByRole("button", { name: "copilot-fetch-x for OpenCode" })
+          .getAttribute("aria-disabled")
+      ).toBe("true");
+      expect(
+        screen
+          .getByRole("button", { name: "obsidian-markdown for OpenCode" })
+          .getAttribute("aria-disabled")
+      ).toBe("false");
     });
 
     it("shows a new install's Obsidian skills off for Claude and Codex, except Bases for Codex, and an existing install's saved choices unchanged https://github.com/Brevilabs/obsidian-copilot-private/issues/726", async () => {

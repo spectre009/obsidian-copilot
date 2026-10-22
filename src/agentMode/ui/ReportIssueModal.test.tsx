@@ -248,6 +248,32 @@ describe("ReportIssueModal", () => {
       Object.assign(Modal.prototype, { setTitle: jest.fn() });
     });
 
+    afterEach(() => {
+      setSettings({ blockVendorServices: false });
+    });
+
+    it("offers the report upload while vendor services are allowed", () => {
+      setSettings({ blockVendorServices: false });
+      const plugin = { app: {} as App, manifest: { version: "4.1.0" } as PluginManifest };
+
+      const modal = openReportIssueModal(plugin, { activeBackend: "codex" }) as unknown as {
+        params: { uploader?: unknown };
+      };
+
+      expect(typeof modal.params.uploader).toBe("function");
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 opens the dialog without an uploader while vendor services are blocked", () => {
+      setSettings({ blockVendorServices: true });
+      const plugin = { app: {} as App, manifest: { version: "4.1.0" } as PluginManifest };
+
+      const modal = openReportIssueModal(plugin, { activeBackend: "codex" }) as unknown as {
+        params: { uploader?: unknown };
+      };
+
+      expect(modal.params.uploader).toBeUndefined();
+    });
+
     it("opens the dialog with the plugin's version and the card's prefill", () => {
       const plugin = { app: {} as App, manifest: { version: "4.1.0" } as PluginManifest };
       const onReported = jest.fn();

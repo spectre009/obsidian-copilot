@@ -122,6 +122,29 @@ describe("descriptor", () => {
         options
       );
     });
+    it.each([
+      ["passes", "allowed", false, true],
+      ["withholds", "blocked", true, false],
+    ])(
+      "https://github.com/spectre009/obsidian-copilot/issues/1 %s a lowercase vendor license variable to the sign-out CLI while vendor services are %s",
+      async (_verb, _state, blockVendorServices, expectKey) => {
+        mockResolveClaudeBinary.mockReturnValue("/custom/claude");
+        jest.mocked(signOutFromClaude).mockResolvedValue({ loggedIn: false });
+        const settings = {
+          ...settingsWithClaudeRuntime({
+            envOverrides: { copilot_plus_license_key: "override-license", KEEP: "yes" },
+          }),
+          blockVendorServices,
+        };
+
+        await ClaudeBackendDescriptor.auth.signOut!(settings);
+
+        const env = jest.mocked(signOutFromClaude).mock.calls[0][1] as Record<string, string>;
+        expect(env.KEEP).toBe("yes");
+        expect("copilot_plus_license_key" in env).toBe(expectKey);
+      }
+    );
+
     it("https://github.com/Brevilabs/obsidian-copilot-private/issues/379 does not claim credentials were removed when the CLI is missing", async () => {
       mockResolveClaudeBinary.mockReturnValue(null);
       await expect(

@@ -3,9 +3,13 @@ import {
   formatReleaseNotesForObsidian,
   requestReleaseNotesSince,
 } from "@/components/release-update/releaseNotes";
+import { setSettings } from "@/settings/model";
 import { requestUrl, type RequestUrlResponse } from "obsidian";
 
-jest.mock("obsidian", () => ({ requestUrl: jest.fn() }));
+jest.mock("obsidian", () => ({
+  ...jest.requireActual<typeof import("obsidian")>("obsidian"),
+  requestUrl: jest.fn(),
+}));
 
 const ISSUE_URL = "https://github.com/Brevilabs/obsidian-copilot-private/issues/317";
 const ISSUE_600_URL = "https://github.com/Brevilabs/obsidian-copilot-private/issues/600";
@@ -89,6 +93,28 @@ describe("releaseNotes", () => {
 
     beforeEach(() => {
       jest.mocked(requestUrl).mockReset();
+      setSettings({ blockVendorServices: false });
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 returns only the latest release without requesting upstream history while vendor services are blocked", async () => {
+      setSettings({ blockVendorServices: true });
+
+      await expect(requestReleaseNotesSince("4.0.8", LATEST)).resolves.toEqual([LATEST]);
+      expect(requestUrl).not.toHaveBeenCalled();
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/1 stops paging release history once blocking turns on mid-request", async () => {
+      jest.mocked(requestUrl).mockImplementationOnce(() => {
+        setSettings({ blockVendorServices: true });
+        return Promise.resolve(
+          respond(
+            Array.from({ length: 30 }, (_, i) => listItem(`4.0.12-rc.${i}`, { prerelease: true }))
+          )
+        ) as ReturnType<typeof requestUrl>;
+      });
+
+      await expect(requestReleaseNotesSince("4.0.8", LATEST)).resolves.toEqual([LATEST]);
+      expect(requestUrl).toHaveBeenCalledTimes(1);
     });
 
     it(`returns the latest release followed by each skipped stable release, newest first, for ${ISSUE_600_URL}`, async () => {

@@ -4,6 +4,7 @@ import { logError } from "@/logger";
 import type { ModelCapability } from "@/constants";
 import type { ModelSelectorEntry } from "@/components/ui/ModelSelector";
 import { lockedCopilotEntries, shouldPreviewCopilotModels } from "@/lib/lockedCopilotEntries";
+import { visibleCopilotPlusCatalog } from "@/vendorServices/vendorServicesPolicy";
 import type { AgentSession } from "@/agentMode/session/AgentSession";
 import type { AgentChatUIState } from "@/agentMode/session/AgentChatUIState";
 import type { AgentSessionManager } from "@/agentMode/session/AgentSessionManager";
@@ -243,7 +244,7 @@ export function buildPickerEntries(
       entries.splice(
         sectionStart,
         0,
-        ...lockedCopilotEntries(settings.copilotPlusCatalog, {
+        ...lockedCopilotEntries(visibleCopilotPlusCatalog(settings), {
           group: descriptor.displayName,
           backendId: descriptor.id,
         })

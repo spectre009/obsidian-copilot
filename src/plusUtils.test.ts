@@ -74,13 +74,18 @@ import {
   isPreviewEnabled,
   isSelfHostModeValid,
   markPaidPendingEntitlement,
+  multiAgentRefusalMessage,
   navigateToPlusPage,
+  showMultiAgentUpgradePrompt,
   turnOffPaid,
+  useCanUseMultiAgent,
+  useIsPaidUser,
   useIsPreviewEnabled,
   useIsSelfHostEligible,
   useLicenseState,
   verifyCachedEntitlement,
 } from "@/plusUtils";
+import { VENDOR_SERVICES_BLOCKED_MESSAGE } from "@/vendorServices/vendorServicesPolicy";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { Notice } from "obsidian";
 
@@ -89,8 +94,10 @@ const PAST_EXP_SECONDS = 1_000_000_000;
 const STORED_LICENSE_KEY = "key";
 
 function buildSettings(overrides: Partial<CopilotSettings>): CopilotSettings {
-  return { ...DEFAULT_SETTINGS, ...overrides };
+  return { ...DEFAULT_SETTINGS, blockVendorServices: false, ...overrides };
 }
+
+const BLOCKED_ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/1";
 
 async function verifySessionFeatures(
   features: string[],
@@ -177,6 +184,60 @@ describe("plusUtils", () => {
         );
       }
     );
+
+    it(`opens no vendor page and explains the block instead while vendor services are blocked — ${BLOCKED_ISSUE}`, () => {
+      const open = jest.spyOn(window, "open").mockImplementation(() => null);
+      mockGetSettings.mockReturnValue(buildSettings({ blockVendorServices: true }));
+
+      navigateToPlusPage("settings");
+
+      expect(open).not.toHaveBeenCalled();
+      expect(Notice).toHaveBeenCalledWith(VENDOR_SERVICES_BLOCKED_MESSAGE);
+    });
+  });
+
+  describe("showMultiAgentUpgradePrompt()", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it("announces the upgrade and opens the pricing page while vendor services are allowed", () => {
+      const open = jest.spyOn(window, "open").mockImplementation(() => null);
+
+      showMultiAgentUpgradePrompt();
+
+      expect(Notice).toHaveBeenCalledWith(
+        expect.stringContaining("Opening the upgrade page"),
+        8000
+      );
+      expect(open).toHaveBeenCalledTimes(1);
+    });
+
+    it(`explains the block without opening any page while vendor services are blocked — ${BLOCKED_ISSUE}`, () => {
+      const open = jest.spyOn(window, "open").mockImplementation(() => null);
+      mockGetSettings.mockReturnValue(buildSettings({ blockVendorServices: true }));
+
+      showMultiAgentUpgradePrompt();
+
+      expect(open).not.toHaveBeenCalled();
+      expect(Notice).toHaveBeenCalledWith(
+        expect.stringContaining(VENDOR_SERVICES_BLOCKED_MESSAGE),
+        8000
+      );
+    });
+  });
+
+  describe("multiAgentRefusalMessage()", () => {
+    it("invites an upgrade while vendor services are allowed", () => {
+      expect(multiAgentRefusalMessage()).toBe(
+        "Multi-agent QA is a Copilot Plus feature. Upgrade to mention more than one agent in a turn."
+      );
+    });
+
+    it(`names the vendor-services block instead of upselling while blocked — ${BLOCKED_ISSUE}`, () => {
+      mockGetSettings.mockReturnValue(buildSettings({ blockVendorServices: true }));
+
+      expect(multiAgentRefusalMessage()).toContain(VENDOR_SERVICES_BLOCKED_MESSAGE);
+      expect(multiAgentRefusalMessage()).not.toContain("Upgrade");
+    });
   });
 
   describe("applyLicenseSettings()", () => {
@@ -211,6 +272,19 @@ describe("plusUtils", () => {
 
       expect(mockSetModelKey).toHaveBeenCalledWith(FLASH_CONFIGURED_ID);
       expect(mockSetSettings).toHaveBeenCalledWith({ defaultModelKey: FLASH_CONFIGURED_ID });
+    });
+
+    it(`selects no Copilot model and seeds no agent default while vendor services are blocked — ${BLOCKED_ISSUE}`, async () => {
+      mockGetSettings.mockReturnValue({
+        ...settingsWithFlashConfigured(),
+        blockVendorServices: true,
+      });
+
+      await applyLicenseSettings();
+
+      expect(mockSetModelKey).not.toHaveBeenCalled();
+      expect(mockSetSettings).not.toHaveBeenCalled();
+      expect(mockApplyCopilotDefaultModel).not.toHaveBeenCalled();
     });
 
     it("writes no chain type or embedding model — both belong to retired surfaces", async () => {
@@ -581,9 +655,26 @@ describe("plusUtils", () => {
       expect(isPlusEnabled()).toBe(false);
       expect(isSelfHostModeValid()).toBe(false);
     });
+
+    it(`writes nothing while vendor services are blocked, so a late license answer cannot restore paid state — ${BLOCKED_ISSUE}`, () => {
+      mockGetSettings.mockReturnValue(buildSettings({ blockVendorServices: true }));
+
+      markPaidPendingEntitlement();
+
+      expect(mockSetSettings).not.toHaveBeenCalled();
+    });
   });
 
   describe("isPlusEnabled()", () => {
+    it(`returns false for a verified Plus user while vendor services are blocked — ${BLOCKED_ISSUE}`, async () => {
+      await verifySessionFeatures(["multi_agent"]);
+      mockGetSettings.mockReturnValue(
+        tokenBackedSettings({ isPlusUser: true, blockVendorServices: true })
+      );
+
+      expect(isPlusEnabled()).toBe(false);
+    });
+
     it("returns false for a free user", () => {
       mockGetSettings.mockReturnValue(buildSettings({ isPlusUser: false }));
       expect(isPlusEnabled()).toBe(false);
@@ -660,6 +751,47 @@ describe("plusUtils", () => {
 
       await expect(ensureMultiAgentEntitlement()).resolves.toBe(false);
       expect(mockValidateLicenseKey).toHaveBeenCalledTimes(1);
+    });
+
+    it(`refuses without a license check while vendor services are blocked, even for a cached Plus user — ${BLOCKED_ISSUE}`, async () => {
+      mockGetSettings.mockReturnValue(
+        buildSettings({ isPaidUser: true, isPlusUser: true, blockVendorServices: true })
+      );
+
+      await expect(ensureMultiAgentEntitlement()).resolves.toBe(false);
+      expect(mockValidateLicenseKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("useIsPaidUser()", () => {
+    it("reports the stored paid state while vendor services are allowed", () => {
+      mockGetSettings.mockReturnValue(buildSettings({ isPaidUser: true }));
+
+      expect(renderHook(() => useIsPaidUser()).result.current).toBe(true);
+    });
+
+    it(`reports false for a paid user while vendor services are blocked — ${BLOCKED_ISSUE}`, () => {
+      mockGetSettings.mockReturnValue(
+        buildSettings({ isPaidUser: true, blockVendorServices: true })
+      );
+
+      expect(renderHook(() => useIsPaidUser()).result.current).toBe(false);
+    });
+  });
+
+  describe("useCanUseMultiAgent()", () => {
+    it("allows multi-agent for a stored Plus user while vendor services are allowed", () => {
+      mockGetSettings.mockReturnValue(buildSettings({ isPlusUser: true }));
+
+      expect(renderHook(() => useCanUseMultiAgent()).result.current).toBe(true);
+    });
+
+    it(`disallows multi-agent for a Plus user while vendor services are blocked — ${BLOCKED_ISSUE}`, () => {
+      mockGetSettings.mockReturnValue(
+        buildSettings({ isPlusUser: true, blockVendorServices: true })
+      );
+
+      expect(renderHook(() => useCanUseMultiAgent()).result.current).toBe(false);
     });
   });
 
@@ -762,6 +894,29 @@ describe("plusUtils", () => {
       expect(await applyEntitlement("bad")).toBe(false);
       expect(mockSetSettings).not.toHaveBeenCalled();
     });
+
+    it(`drops a verified token when vendor services were blocked during verification — ${BLOCKED_ISSUE}`, async () => {
+      mockVerifyEntitlement.mockImplementation(async () => {
+        mockGetSettings.mockReturnValue(
+          buildSettings({
+            userId: "user-123",
+            plusLicenseKey: STORED_LICENSE_KEY,
+            blockVendorServices: true,
+          })
+        );
+        return {
+          user_id: "user-123",
+          plan: "believer",
+          tier: "plus",
+          features: ["multi_agent"],
+          iat: 0,
+          exp: FUTURE_EXP_SECONDS,
+        };
+      });
+
+      expect(await applyEntitlement("token")).toBe(false);
+      expect(mockSetSettings).not.toHaveBeenCalled();
+    });
   });
 
   describe("verifyCachedEntitlement()", () => {
@@ -820,6 +975,25 @@ describe("plusUtils", () => {
   });
 
   describe("checkIsPaidUser()", () => {
+    it(`returns false with no license request and no sign-out while vendor services are blocked — ${BLOCKED_ISSUE}`, async () => {
+      mockGetSettings.mockReturnValue(
+        buildSettings({ plusLicenseKey: "key", isPaidUser: true, blockVendorServices: true })
+      );
+
+      expect(await checkIsPaidUser({} as never, { trigger: "startup" })).toBe(false);
+      expect(mockValidateLicenseKey).not.toHaveBeenCalled();
+      expect(mockSetSettings).not.toHaveBeenCalled();
+    });
+
+    it(`keeps the stored paid state when blocked with no license key, so unblocking can restore it — ${BLOCKED_ISSUE}`, async () => {
+      mockGetSettings.mockReturnValue(
+        buildSettings({ plusLicenseKey: "", isPaidUser: true, blockVendorServices: true })
+      );
+
+      expect(await checkIsPaidUser({} as never, { trigger: "startup" })).toBe(false);
+      expect(mockSetSettings).not.toHaveBeenCalled();
+    });
+
     it("returns false without reaching the server when no license key is set", async () => {
       mockGetSettings.mockReturnValue(buildSettings({ plusLicenseKey: "" }));
 

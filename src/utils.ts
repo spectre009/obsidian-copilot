@@ -13,6 +13,8 @@ import { MemoryVariables } from "@langchain/core/memory";
 import { DateTime } from "luxon";
 import { App, MarkdownView, Notice, TFile, Vault, normalizePath, requestUrl } from "obsidian";
 import { CustomModel } from "./aiParams";
+import { getSettings } from "@/settings/model";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
 export { err2String } from "@/lib/model-display-utils";
 
 export function getDomainFromUrl(url: string): string {
@@ -699,6 +701,11 @@ export async function checkLatestVersion(): Promise<{
   error: string | null;
   release: LatestRelease | null;
 }> {
+  // This build replaces the upstream plugin, so its release feed is blocked with vendor services.
+  // https://github.com/spectre009/obsidian-copilot/issues/1
+  if (areVendorServicesBlocked(getSettings())) {
+    return { version: null, error: null, release: null };
+  }
   try {
     const response = await requestUrl({
       url: LATEST_RELEASE_API_URL,
@@ -713,6 +720,9 @@ export async function checkLatestVersion(): Promise<{
       !manifestAsset.browser_download_url
     ) {
       throw new Error("The latest Copilot release has no manifest.json asset.");
+    }
+    if (areVendorServicesBlocked(getSettings())) {
+      return { version: null, error: null, release: null };
     }
     const manifestResponse = await requestUrl({
       url: manifestAsset.browser_download_url,

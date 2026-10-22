@@ -29,6 +29,7 @@ import { getSettings } from "@/settings/model";
 import { NoteSelectedTextContext, WebSelectedTextContext } from "@/types/message";
 import { isSourceModeOn } from "@/utils";
 import { isDesktopRuntime } from "@/utils/desktopRuntime";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
 import { Editor, MarkdownView, Notice, TFile } from "obsidian";
 import { v4 as uuidv4 } from "uuid";
 import { COMMAND_IDS, COMMAND_ICONS, COMMAND_NAMES, CommandId } from "@/constants";
@@ -83,6 +84,9 @@ function addCheckCommand(
 
 export function registerCommands(plugin: CopilotPlugin, publish: PublishFile) {
   addCheckCommand(plugin, COMMAND_IDS.PUBLISH_FILE_TO_OPENARTIFACTS, (checking) => {
+    // Hidden rather than unregistered so it reappears when the block is lifted, without a reload.
+    // https://github.com/spectre009/obsidian-copilot/issues/1
+    if (areVendorServicesBlocked(getSettings())) return false;
     const activeFile = plugin.app.workspace.getActiveFile();
     if (!(activeFile instanceof TFile) || activeFile.extension !== "md") {
       return false;
@@ -367,15 +371,20 @@ export function registerCommands(plugin: CopilotPlugin, publish: PublishFile) {
     modal.open();
   });
 
-  addCommand(plugin, COMMAND_IDS.DOWNLOAD_YOUTUBE_SCRIPT, async () => {
-    const isPaidUser = await checkIsPaidUser(plugin.app, { trigger: "tool_call" });
-    if (!isPaidUser) {
-      new Notice("Download YouTube Script (plus) is a Copilot Plus feature");
-      return;
-    }
+  addCheckCommand(plugin, COMMAND_IDS.DOWNLOAD_YOUTUBE_SCRIPT, (checking) => {
+    if (areVendorServicesBlocked(getSettings())) return false;
+    if (checking) return true;
+    void (async () => {
+      const isPaidUser = await checkIsPaidUser(plugin.app, { trigger: "tool_call" });
+      if (!isPaidUser) {
+        new Notice("Download YouTube Script (plus) is a Copilot Plus feature");
+        return;
+      }
 
-    const modal = new YoutubeTranscriptModal(plugin.app);
-    modal.open();
+      const modal = new YoutubeTranscriptModal(plugin.app);
+      modal.open();
+    })().catch((err) => logError(`Command ${COMMAND_IDS.DOWNLOAD_YOUTUBE_SCRIPT} failed`, err));
+    return true;
   });
 
   addCheckCommand(plugin, COMMAND_IDS.TRIGGER_QUICK_ASK, (checking: boolean) => {
