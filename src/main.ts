@@ -96,6 +96,7 @@ import { buildUpgradeRelocationEntries } from "@/settings/upgradeNotice";
 import { dehydrateDeviceProfile, hydrateDeviceProfile } from "@/settings/deviceProfiles";
 import { getDeviceId } from "@/utils/deviceId";
 import { isDesktopRuntime } from "@/utils/desktopRuntime";
+import { startGitHubCopilotQuickChat } from "@/LLMProviders/githubCopilot/githubCopilotQuickChat";
 import { disposeNotificationSound } from "@/utils/notificationSound";
 import { installRendererEventsShim } from "@/utils/rendererEventsShim";
 import { ContextProcessor } from "@/contextProcessor";
@@ -176,6 +177,7 @@ export default class CopilotPlugin extends Plugin implements CopilotStartup {
   private PlanPreviewView?: typeof import("@/agentMode").PlanPreviewView;
   private TurnDiffView?: typeof import("@/agentMode").TurnDiffView;
   private agentModelDiscoveryUnsubscriber?: () => void;
+  private stopGitHubCopilotQuickChat?: () => Promise<void>;
   modelManagement!: ModelManagementApi;
   selfHostWebSearchAgentBridge?: Readonly<SelfHostWebSearchAgentBridge>;
   private ribbonIconEl?: HTMLElement;
@@ -406,6 +408,11 @@ export default class CopilotPlugin extends Plugin implements CopilotStartup {
       this.agentModelDiscoveryUnsubscriber = wireAgentModelDiscovery(
         this,
         this.agentSessionManager
+      );
+      this.stopGitHubCopilotQuickChat = await startGitHubCopilotQuickChat(
+        this.app,
+        this.modelManagement,
+        this.manifest.version
       );
     }
 
@@ -690,6 +697,7 @@ export default class CopilotPlugin extends Plugin implements CopilotStartup {
     this.chatSelectionHighlightController?.cleanup();
 
     this.agentModelDiscoveryUnsubscriber?.();
+    await this.stopGitHubCopilotQuickChat?.();
     await this.agentSessionManager?.shutdown();
 
     const vaultDataManager = VaultDataManager.getInstance();
@@ -1466,8 +1474,11 @@ export default class CopilotPlugin extends Plugin implements CopilotStartup {
     if (getSettings().enableRecentConversations) {
       try {
         const chainManager = this.chainOwner.getCurrentChainManager();
-        const chatModel = chainManager.chatModelManager.getChatModel();
-        this.userMemoryManager.addRecentConversation(this.chatUIState.getMessages(), chatModel);
+        // Summaries run for every new chat, so they use the background model.
+        // https://github.com/spectre009/obsidian-copilot/issues/3
+        this.userMemoryManager.addRecentConversation(this.chatUIState.getMessages(), () =>
+          chainManager.getBackgroundChatModel()
+        );
       } catch (error) {
         logInfo("Failed to analyze chat messages for memory:", error);
       }

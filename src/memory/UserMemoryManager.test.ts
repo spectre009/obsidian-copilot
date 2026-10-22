@@ -155,6 +155,18 @@ describe("UserMemoryManager", () => {
       expect(mockVault.create.mock.calls[0][1]).toContain("## First Chat\n");
     });
 
+    it("summarizes with a model resolved when the work starts, such as the background model (https://github.com/spectre009/obsidian-copilot/issues/3)", async () => {
+      mockVault.getAbstractFileByPath.mockReturnValue(null);
+      replyWith(JSON.stringify({ title: "Lazy Chat", summary: "Resolved later." }));
+      const resolveModel = jest.fn(async () => mockChatModel);
+
+      userMemoryManager.addRecentConversation(messages, resolveModel as never);
+
+      await waitFor(() => expect(mockVault.create).toHaveBeenCalled());
+      expect(resolveModel).toHaveBeenCalledTimes(1);
+      expect(mockVault.create.mock.calls[0][1]).toContain("## Lazy Chat\n");
+    });
+
     it("replaces the file content when the existing file is blank", async () => {
       existingRecentFile("  \n");
       replyWith(JSON.stringify({ title: "First Chat", summary: "A first summary." }));

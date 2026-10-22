@@ -24,6 +24,9 @@ jest.mock("@/hooks/useChatBackendModelOptions", () => ({
 jest.mock("@/settings/v2/components/ChatModelEnableList", () => ({
   ChatModelEnableList: () => <div>Enabled chat models</div>,
 }));
+jest.mock("@/settings/v2/components/QuickChatGitHubCopilotPanel", () => ({
+  QuickChatGitHubCopilotPanel: () => <div>GitHub Copilot controls</div>,
+}));
 
 describe("QuickChatPanel", () => {
   describe("QuickChatPanel()", () => {
@@ -33,6 +36,11 @@ describe("QuickChatPanel", () => {
       expect(screen.getByText("Enabled chat models")).not.toBeNull();
       fireEvent.change(screen.getByRole("combobox"), { target: { value: "b" } });
       expect(updateSetting).toHaveBeenCalledWith("defaultModelKey", "b");
+    });
+
+    it("shows the background model and GitHub Copilot controls below the model list (https://github.com/spectre009/obsidian-copilot/issues/3)", () => {
+      render(<QuickChatPanel />);
+      expect(screen.getByText("GitHub Copilot controls")).not.toBeNull();
     });
   });
 });

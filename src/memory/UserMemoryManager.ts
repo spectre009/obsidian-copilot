@@ -46,7 +46,16 @@ export class UserMemoryManager {
     }
   }
 
-  addRecentConversation(messages: ChatMessage[], chatModel?: BaseChatModel): void {
+  /**
+   * Summarizes a finished chat into the recent-conversations memory in the background.
+   * https://github.com/spectre009/obsidian-copilot/issues/3
+   * @param messages the chat's messages
+   * @param chatModel the model to summarize with, or a function resolving it when the work starts
+   */
+  addRecentConversation(
+    messages: ChatMessage[],
+    chatModel?: BaseChatModel | (() => Promise<BaseChatModel | null>)
+  ): void {
     const settings = getSettings();
 
     if (!settings.enableRecentConversations) {
@@ -154,7 +163,10 @@ export class UserMemoryManager {
     return section;
   }
 
-  private async updateMemory(messages: ChatMessage[], chatModel?: BaseChatModel): Promise<void> {
+  private async updateMemory(
+    messages: ChatMessage[],
+    modelOrResolver?: BaseChatModel | (() => Promise<BaseChatModel | null>)
+  ): Promise<void> {
     if (this.isUpdatingMemory) {
       logInfo("[UserMemoryManager] Memory update already in progress, skipping.");
       return;
@@ -162,6 +174,8 @@ export class UserMemoryManager {
 
     this.isUpdatingMemory = true;
     try {
+      const chatModel =
+        typeof modelOrResolver === "function" ? await modelOrResolver() : modelOrResolver;
       if (!chatModel) {
         logError("[UserMemoryManager] No chat model available, skipping memory update");
         return;

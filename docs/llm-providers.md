@@ -16,7 +16,7 @@ Settings show where each source sends your requests. Hover the small icon next t
 | **Models reported by opencode**     | No         | opencode                                   |
 | **Claude Code account**             | No         | Claude                                     |
 | **Codex account**                   | No         | Codex                                      |
-| **GitHub Copilot plan**             | No         | GitHub Copilot                             |
+| **GitHub Copilot plan**             | Desktop    | GitHub Copilot                             |
 
 Models reported by opencode are routed to their backing provider. Free
 opencode Zen models show a warning because that provider may log or train on
@@ -121,13 +121,29 @@ Claude, Codex, and GitHub Copilot are Agent Chat backends, not BYOK providers:
   environment, so this agent always uses your GitHub sign-in.
 
 Copilot discovers the models reported by each agent and lets you enable them
-under **Basic → Agents → Claude**, **Codex**, or **GitHub Copilot**. Those
-models stay inside their respective agents; they do not become Quick Chat or
-opencode models.
+under **Basic → Agents → Claude**, **Codex**, or **GitHub Copilot**. Claude and
+Codex models stay inside their agents; GitHub Copilot models can also run in
+Quick Chat, as described below. None of them become opencode models.
 
 An OpenAI API key is different from a ChatGPT subscription, just as an
 Anthropic API key is different from a Claude Code subscription. Use **BYOK** for
 API access and the matching agent setup for subscription access.
+
+## GitHub Copilot models in Quick Chat
+
+On desktop, the models of your GitHub Copilot plan also appear in Quick Chat, Quick Ask, and Copilot Commands. Copilot runs them through the same installed GitHub Copilot CLI as the GitHub Copilot agent, using the official GitHub Copilot SDK. Each request is a short, tool-free session whose system prompt is Copilot's Quick Chat prompt instead of GitHub Copilot's own. Mobile can't run the CLI, so these models need desktop Obsidian.
+
+- **Models.** Quick Chat and the GitHub Copilot agent share one model list. Copilot reads it from the CLI at startup, so Quick Chat doesn't wait for an Agent Chat session, and enables each new model in Quick Chat once. A model you turn off under **Basic → Agents → Quick Chat** stays off.
+- **Account.** Requests use the CLI's stored sign-in from `copilot login`, or, without one, the GitHub CLI's (`gh`) active github.com account. Switching `gh`'s active account switches the account that pays. **Basic → Agents → Quick Chat** shows the signed-in account. Copilot handles no tokens itself.
+- **Images.** Vision models receive images attached to your latest message, within each model's limits on type, size, and count; a notice explains any image left out. Images in earlier messages are described to the model as `[image omitted]`. Models without vision show a notice, and a message with only images is not sent to them.
+- **Earlier turns.** The SDK takes one prompt per request, so Copilot quotes the earlier turns of the chat in order before your new message. The model sees the whole conversation, but not as separate chat roles.
+- **No tool calling.** GitHub Copilot models can't call Quick Chat's tools. **Vault chat** finds notes for them automatically instead; see [Quick Chat](chat-interface.md#choose-a-chat-mode).
+
+### What GitHub Copilot requests cost
+
+Every Quick Chat turn, Quick Ask, and command run is one GitHub Copilot request, billed to your plan at the model's multiplier: smaller models such as Claude Haiku 4.5 cost a fraction of a request, while the largest models can cost many requests each. Depending on your plan, GitHub bills these as premium requests or as AI credits priced per token; see [GitHub's billing documentation](https://docs.github.com/en/copilot/concepts/billing-and-usage/individuals/billing).
+
+Quick Chat also makes background calls: query expansion on every turn that searches the vault, a title for each new chat, and a summary of each finished chat. That is roughly two requests per vault-chat turn plus two per chat. The **Background model** setting sends these calls to a cheaper model, Claude Haiku 4.5 by default when your plan offers it, so they don't bill at the chat model's multiplier. Context compaction stays on the chat model, because it rewrites what the chat model reads.
 
 ## Where keys are stored
 

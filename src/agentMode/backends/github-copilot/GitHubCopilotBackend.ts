@@ -23,6 +23,16 @@ export const GITHUB_COPILOT_ACP_ARGS = [
 export const GITHUB_COPILOT_NOT_FOUND_MESSAGE =
   "GitHub Copilot CLI not found. Install it, then open Agent Mode settings and run Auto-detect.";
 
+/**
+ * Extra launch arguments from the agent's settings. The context tier is a launch flag because ACP
+ * has no per-session context control. https://github.com/spectre009/obsidian-copilot/issues/3
+ * @param settings the current settings
+ */
+export function githubCopilotSpawnArgs(settings: Readonly<CopilotSettings>): string[] {
+  const contextWindow = settings.agentMode?.backends?.["github-copilot"]?.contextWindow;
+  return contextWindow === "long_context" ? ["--context", "long_context"] : [];
+}
+
 export interface GitHubCopilotLaunch {
   resolveBinary(settings: Readonly<CopilotSettings>): string | null;
   assertCompatible(binaryPath: string, env: NodeJS.ProcessEnv): Promise<void>;
@@ -73,6 +83,11 @@ export class GitHubCopilotBackend implements AcpBackend {
     );
     await this.launch.assertCompatible(command, env);
     await writeGitHubCopilotInstructions(home, buildAgentSystemPrompt(this.id));
-    return { command, args: [...GITHUB_COPILOT_ACP_ARGS], cwd: ctx.vaultBasePath, env };
+    return {
+      command,
+      args: [...GITHUB_COPILOT_ACP_ARGS, ...githubCopilotSpawnArgs(settings)],
+      cwd: ctx.vaultBasePath,
+      env,
+    };
   }
 }

@@ -524,7 +524,9 @@ export class ChatPersistenceManager {
     }
 
     try {
-      const chatModel = this.chainManager.chatModelManager.getChatModel();
+      // Titles are generated for every new chat, so they use the background model.
+      // https://github.com/spectre009/obsidian-copilot/issues/3
+      const chatModel = await this.chainManager.getBackgroundChatModel();
       if (!chatModel) {
         return undefined;
       }

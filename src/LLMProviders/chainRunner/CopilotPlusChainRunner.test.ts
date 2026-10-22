@@ -1,4 +1,5 @@
 import { CopilotPlusChainRunner } from "@/LLMProviders/chainRunner/CopilotPlusChainRunner";
+import { getSettings } from "@/settings/model";
 import { ToolManager } from "@/tools/toolManager";
 import type { StructuredTool } from "@langchain/core/tools";
 
@@ -47,6 +48,39 @@ function extractEmbeddedImages(
 }
 
 describe("CopilotPlusChainRunner", () => {
+  describe("processAtCommands()", () => {
+    function processAtCommands(message: string) {
+      const runner = new CopilotPlusChainRunner({ app: {} } as never) as unknown as {
+        processAtCommands: (
+          message: string,
+          existing: ToolCall[],
+          context: { salientTerms: string[] }
+        ) => Promise<ToolCall[]>;
+      };
+      return runner.processAtCommands(message, [], { salientTerms: ["gardening"] });
+    }
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it("plans a local vault search for @vault, which is how vault chat finds notes (https://github.com/spectre009/obsidian-copilot/issues/3)", async () => {
+      const calls = await processAtCommands("@vault what did I write about gardening");
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].args).toMatchObject({
+        query: "what did I write about gardening",
+        salientTerms: ["gardening"],
+      });
+    });
+
+    it("never plans web search while vendor services are blocked (https://github.com/spectre009/obsidian-copilot/issues/3)", async () => {
+      jest.mocked(getSettings).mockReturnValueOnce({ blockVendorServices: true } as never);
+
+      await expect(processAtCommands("@websearch latest news")).resolves.toEqual([]);
+    });
+  });
+
   describe("executeToolCalls()", () => {
     beforeEach(() => {
       jest.clearAllMocks();

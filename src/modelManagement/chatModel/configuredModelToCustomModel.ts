@@ -30,6 +30,11 @@ export function mapProviderTypeToChatModelProvider(provider: Provider): ChatMode
   if (provider.origin.kind === "copilot-plus") {
     return ChatModelProviders.COPILOT_PLUS;
   }
+  // GitHub Copilot's agent-provided models run in Quick Chat through the Copilot CLI, not the
+  // provider type the agent registered with. https://github.com/spectre009/obsidian-copilot/issues/3
+  if (provider.origin.kind === "agent" && provider.origin.agentType === "github-copilot") {
+    return ChatModelProviders.GITHUB_COPILOT;
+  }
 
   switch (provider.providerType) {
     case "anthropic":

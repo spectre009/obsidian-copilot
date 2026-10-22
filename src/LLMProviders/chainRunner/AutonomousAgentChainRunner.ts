@@ -1,8 +1,8 @@
 import { AGENT_LOOP_TIMEOUT_MS } from "@/constants";
 import { MessageContent } from "@/imageProcessing/imageProcessor";
 import { logError, logInfo, logWarn } from "@/logger";
-import { checkIsPaidUser } from "@/plusUtils";
 import { getSettings } from "@/settings/model";
+import { canRunVaultChat, withoutVendorTools } from "@/vendorServices/localVaultChat";
 import { initializeBuiltinTools } from "@/tools/builtinTools";
 import { ToolRegistry } from "@/tools/ToolRegistry";
 import { StructuredTool } from "@langchain/core/tools";
@@ -120,7 +120,10 @@ export class AutonomousAgentChainRunner extends CopilotPlusChainRunner {
 
     const enabledToolIds = new Set(settings.autonomousAgentEnabledToolIds || []);
 
-    return registry.getEnabledTools(enabledToolIds, !!this.chainManager.app?.vault);
+    return withoutVendorTools(
+      registry.getEnabledTools(enabledToolIds, !!this.chainManager.app?.vault),
+      settings
+    );
   }
 
   private startReasoningTimer(
@@ -249,7 +252,7 @@ export class AutonomousAgentChainRunner extends CopilotPlusChainRunner {
     this.llmFormattedMessages = [];
     this.lastDisplayedContent = "";
 
-    const isPaidUser = await checkIsPaidUser(this.chainManager.app, {
+    const isPaidUser = await canRunVaultChat(this.chainManager.app, {
       trigger: "legacy_chat_turn",
       isAutonomousAgent: true,
     });

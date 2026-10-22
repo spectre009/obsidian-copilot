@@ -1,6 +1,9 @@
 import { useChainType } from "@/aiParams";
+import { useQuickChatModelCanCallTools } from "@/hooks/useQuickChatModelCanCallTools";
 import { useSettingsValue } from "@/settings/model";
 import { isPlusChain } from "@/utils";
+import { isEffectivelyAutonomous } from "@/vendorServices/localVaultChat";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
 import { Notice } from "obsidian";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChatInput, { type ChatInputHandle, type ChatInputProps } from "./ChatInput";
@@ -16,6 +19,8 @@ const ChatModeInput: React.FC<ChatModeInputProps> = (props) => {
   const [currentChain] = useChainType();
   const settings = useSettingsValue();
   const isCopilotPlus = isPlusChain(currentChain);
+  const canCallTools = useQuickChatModelCanCallTools();
+  const vendorServicesBlocked = areVendorServicesBlocked(settings);
 
   const [vaultToggle, setVaultToggle] = useState(false);
   const [webToggle, setWebToggle] = useState(false);
@@ -23,12 +28,27 @@ const ChatModeInput: React.FC<ChatModeInputProps> = (props) => {
   const [autonomousAgentToggle, setAutonomousAgentToggle] = useState(
     settings.enableAutonomousAgent
   );
+  // Models that can't call tools never run the agent, so the input behaves as non-autonomous for
+  // them and adds `@vault` itself. https://github.com/spectre009/obsidian-copilot/issues/3
+  const effectiveAutonomous = isEffectivelyAutonomous(
+    { enableAutonomousAgent: autonomousAgentToggle },
+    canCallTools
+  );
+  const isVaultChat = isCopilotPlus && vendorServicesBlocked && !effectiveAutonomous;
 
   useEffect(() => {
     /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- mirror the persisted setting into the local toggle; the toggle is also user-editable so it can't be pure derived state */
     setAutonomousAgentToggle(settings.enableAutonomousAgent);
     /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- resume checking after the persisted-state synchronization */
   }, [settings.enableAutonomousAgent]);
+
+  // Vault chat exists to find notes, so entering it searches the vault by default; the user can
+  // still turn the toggle off for a turn. https://github.com/spectre009/obsidian-copilot/issues/3
+  useEffect(() => {
+    /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- entering vault chat sets the user-editable toggle's starting value */
+    if (isVaultChat) setVaultToggle(true);
+    /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- resume checking after the mode-entry default */
+  }, [isVaultChat]);
 
   const chatInputRef = useRef<ChatInputHandle>(null);
 
@@ -46,24 +66,26 @@ const ChatModeInput: React.FC<ChatModeInputProps> = (props) => {
 
   const handleToolPillsChange = useCallback(
     (toolNames: string[]) => {
-      if (autonomousAgentToggle) return;
+      if (effectiveAutonomous) return;
       setVaultToggle(toolNames.includes("@vault"));
-      setWebToggle(toolNames.includes("@websearch") || toolNames.includes("@web"));
+      setWebToggle(
+        !vendorServicesBlocked && (toolNames.includes("@websearch") || toolNames.includes("@web"))
+      );
       setComposerToggle(toolNames.includes("@composer"));
     },
-    [autonomousAgentToggle]
+    [effectiveAutonomous, vendorServicesBlocked]
   );
 
   const handleTagSelected = useCallback(() => {
-    if (isCopilotPlus && !autonomousAgentToggle && !vaultToggle) {
+    if (isCopilotPlus && !effectiveAutonomous && !vaultToggle) {
       setVaultToggle(true);
       new Notice("Vault search enabled for tag query");
     }
-  }, [isCopilotPlus, autonomousAgentToggle, vaultToggle]);
+  }, [isCopilotPlus, effectiveAutonomous, vaultToggle]);
 
   const wrappedHandleSendMessage: ChatInputProps["handleSendMessage"] = useCallback(
     (metadata: Parameters<ChatInputProps["handleSendMessage"]>[0]) => {
-      if (!isCopilotPlus || autonomousAgentToggle) {
+      if (!isCopilotPlus || effectiveAutonomous) {
         handleSendMessage(metadata);
         return;
       }
@@ -72,7 +94,12 @@ const ChatModeInput: React.FC<ChatModeInputProps> = (props) => {
       if (vaultToggle && !messageLower.includes("@vault")) {
         toolCalls.push("@vault");
       }
-      if (webToggle && !messageLower.includes("@websearch") && !messageLower.includes("@web")) {
+      if (
+        webToggle &&
+        !vendorServicesBlocked &&
+        !messageLower.includes("@websearch") &&
+        !messageLower.includes("@web")
+      ) {
         toolCalls.push("@websearch");
       }
       if (composerToggle && !messageLower.includes("@composer")) {
@@ -88,7 +115,8 @@ const ChatModeInput: React.FC<ChatModeInputProps> = (props) => {
       handleSendMessage,
       inputMessage,
       isCopilotPlus,
-      autonomousAgentToggle,
+      effectiveAutonomous,
+      vendorServicesBlocked,
       vaultToggle,
       webToggle,
       composerToggle,
@@ -104,8 +132,10 @@ const ChatModeInput: React.FC<ChatModeInputProps> = (props) => {
         setWebToggle={setWebToggle}
         composerToggle={composerToggle}
         setComposerToggle={setComposerToggle}
-        autonomousAgentToggle={autonomousAgentToggle}
+        autonomousAgentToggle={effectiveAutonomous}
         setAutonomousAgentToggle={setAutonomousAgentToggle}
+        showAutonomousAgent={canCallTools}
+        showWebSearch={!vendorServicesBlocked}
         currentChain={currentChain}
         onVaultToggleOff={handleVaultToggleOff}
         onWebToggleOff={handleWebToggleOff}
@@ -116,7 +146,9 @@ const ChatModeInput: React.FC<ChatModeInputProps> = (props) => {
       vaultToggle,
       webToggle,
       composerToggle,
-      autonomousAgentToggle,
+      effectiveAutonomous,
+      canCallTools,
+      vendorServicesBlocked,
       currentChain,
       handleVaultToggleOff,
       handleWebToggleOff,

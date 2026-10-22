@@ -5,6 +5,7 @@ import {
   GITHUB_COPILOT_NOT_FOUND_MESSAGE,
   GitHubCopilotBackend,
   githubCopilotChildEnv,
+  githubCopilotSpawnArgs,
   type GitHubCopilotLaunch,
 } from "./GitHubCopilotBackend";
 import { githubCopilotHomeDir, writeGitHubCopilotInstructions } from "./githubCopilotHome";
@@ -113,6 +114,26 @@ describe("GitHubCopilotBackend", () => {
         expect(hooks.assertCompatible).not.toHaveBeenCalled();
         expect(writeInstructions).not.toHaveBeenCalled();
       });
+
+      it("launches with the long-context tier when the agent's context window is set to it, for https://github.com/spectre009/obsidian-copilot/issues/3", async () => {
+        setSettings((cur) => ({
+          agentMode: {
+            ...cur.agentMode,
+            backends: { "github-copilot": { contextWindow: "long_context" } },
+          },
+        }));
+        const backend = new GitHubCopilotBackend("4.0.15", launch("/bin/copilot"));
+
+        const spawn = await backend.buildSpawnDescriptor({ vaultBasePath: "/vaults/Work" });
+
+        expect(spawn.args).toEqual([...GITHUB_COPILOT_ACP_ARGS, "--context", "long_context"]);
+      });
+    });
+  });
+
+  describe("githubCopilotSpawnArgs()", () => {
+    it("adds no launch flag for the default context window", () => {
+      expect(githubCopilotSpawnArgs(getSettings())).toEqual([]);
     });
   });
 

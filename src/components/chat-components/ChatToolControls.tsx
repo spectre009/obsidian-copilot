@@ -27,6 +27,11 @@ interface ChatToolControlsProps {
   onWebToggleOff?: () => void;
   onComposerToggleOff?: () => void;
 
+  /** False for models that can't call tools, which never run the agent. https://github.com/spectre009/obsidian-copilot/issues/3 */
+  showAutonomousAgent?: boolean;
+  /** False while vendor services are blocked, because web search is one. https://github.com/spectre009/obsidian-copilot/issues/3 */
+  showWebSearch?: boolean;
+
   currentChain: ChainType;
 }
 
@@ -42,10 +47,12 @@ const ChatToolControls: React.FC<ChatToolControlsProps> = ({
   onVaultToggleOff,
   onWebToggleOff,
   onComposerToggleOff,
+  showAutonomousAgent: modelCanRunAgent = true,
+  showWebSearch = true,
   currentChain,
 }) => {
   const isCopilotPlus = isPlusChain(currentChain);
-  const showAutonomousAgent = isCopilotPlus;
+  const showAutonomousAgent = isCopilotPlus && modelCanRunAgent;
 
   const handleAutonomousAgentToggle = () => {
     const newValue = !autonomousAgentToggle;
@@ -123,22 +130,24 @@ const ChatToolControls: React.FC<ChatToolControlsProps> = ({
               </TooltipTrigger>
               <TooltipContent className="tw-px-1 tw-py-0.5">Toggle vault search</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost2"
-                  size="fit"
-                  onClick={handleWebToggle}
-                  className={cn(
-                    "tw-text-muted hover:tw-text-accent",
-                    webToggle && "tw-text-accent tw-bg-accent/10"
-                  )}
-                >
-                  <Globe className="tw-size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="tw-px-1 tw-py-0.5">Toggle web search</TooltipContent>
-            </Tooltip>
+            {showWebSearch && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost2"
+                    size="fit"
+                    onClick={handleWebToggle}
+                    className={cn(
+                      "tw-text-muted hover:tw-text-accent",
+                      webToggle && "tw-text-accent tw-bg-accent/10"
+                    )}
+                  >
+                    <Globe className="tw-size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="tw-px-1 tw-py-0.5">Toggle web search</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -197,16 +206,18 @@ const ChatToolControls: React.FC<ChatToolControlsProps> = ({
                   </div>
                   {vaultToggle && <Check className="tw-size-4" />}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleWebToggle}
-                  className="tw-flex tw-items-center tw-justify-between"
-                >
-                  <div className="tw-flex tw-items-center tw-gap-2">
-                    <Globe className="tw-size-4" />
-                    <span>Web Search</span>
-                  </div>
-                  {webToggle && <Check className="tw-size-4" />}
-                </DropdownMenuItem>
+                {showWebSearch && (
+                  <DropdownMenuItem
+                    onClick={handleWebToggle}
+                    className="tw-flex tw-items-center tw-justify-between"
+                  >
+                    <div className="tw-flex tw-items-center tw-gap-2">
+                      <Globe className="tw-size-4" />
+                      <span>Web Search</span>
+                    </div>
+                    {webToggle && <Check className="tw-size-4" />}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={handleComposerToggle}
                   className="tw-flex tw-items-center tw-justify-between"
@@ -234,15 +245,17 @@ const ChatToolControls: React.FC<ChatToolControlsProps> = ({
                     <span>Vault Search</span>
                   </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled
-                  className="tw-flex tw-items-center tw-justify-between tw-opacity-50"
-                >
-                  <div className="tw-flex tw-items-center tw-gap-2">
-                    <Globe className="tw-size-4" />
-                    <span>Web Search</span>
-                  </div>
-                </DropdownMenuItem>
+                {showWebSearch && (
+                  <DropdownMenuItem
+                    disabled
+                    className="tw-flex tw-items-center tw-justify-between tw-opacity-50"
+                  >
+                    <div className="tw-flex tw-items-center tw-gap-2">
+                      <Globe className="tw-size-4" />
+                      <span>Web Search</span>
+                    </div>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   disabled
                   className="tw-flex tw-items-center tw-justify-between tw-opacity-50"

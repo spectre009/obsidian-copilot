@@ -14,6 +14,12 @@ import type {
   Provider,
 } from "@/modelManagement";
 import { MODEL_SECRET_FIELDS, TOP_LEVEL_SECRET_FIELDS } from "@/services/settingsSecretTransforms";
+import {
+  isGitHubCopilotContextWindow,
+  sanitizeGitHubCopilotQuickChatSettings,
+  type GitHubCopilotContextWindow,
+  type GitHubCopilotQuickChatSettings,
+} from "@/settings/githubCopilotQuickChatSettings";
 import { isNotificationSoundId, type NotificationSoundId } from "@/utils/notificationSoundCatalog";
 import { type SortStrategy, isSortStrategy } from "@/utils/recentUsageManager";
 import {
@@ -120,6 +126,9 @@ export interface CopilotSettings {
   enableSavedMemory: boolean;
   quickCommandModelKey: string | undefined;
   quickCommandIncludeNoteContext: boolean;
+  /** Model for query expansion, chat titles and conversation summaries; "" uses the chat model. https://github.com/spectre009/obsidian-copilot/issues/3 */
+  backgroundModelKey: string;
+  githubCopilotQuickChat: GitHubCopilotQuickChatSettings;
   autoAcceptEdits: boolean;
   diffViewMode: "side-by-side" | "split";
   userSystemPromptsFolder: string;
@@ -199,6 +208,9 @@ export interface GitHubCopilotBackendSettings {
   defaultModel?: ModelSelection | null;
   defaultMode?: CopilotMode | null;
   envOverrides?: Record<string, string>;
+  // Passed as `--context` at spawn, because ACP has no per-session context control.
+  // https://github.com/spectre009/obsidian-copilot/issues/3
+  contextWindow?: GitHubCopilotContextWindow;
 }
 
 export interface DeviceAgentProfile {
@@ -688,6 +700,13 @@ export function sanitizeSettings(settings: CopilotSettings): CopilotSettings {
     sanitizedSettings.quickCommandModelKey = DEFAULT_SETTINGS.quickCommandModelKey;
   }
 
+  if (typeof sanitizedSettings.backgroundModelKey !== "string") {
+    sanitizedSettings.backgroundModelKey = DEFAULT_SETTINGS.backgroundModelKey;
+  }
+  sanitizedSettings.githubCopilotQuickChat = sanitizeGitHubCopilotQuickChatSettings(
+    settingsToSanitize.githubCopilotQuickChat
+  );
+
   if (typeof sanitizedSettings.autoAcceptEdits !== "boolean") {
     sanitizedSettings.autoAcceptEdits = DEFAULT_SETTINGS.autoAcceptEdits;
   }
@@ -1168,6 +1187,7 @@ function sanitizeGitHubCopilotBackendSettings(raw: unknown): GitHubCopilotBacken
     defaultModel: sanitizeDefaultModel(r.defaultModel),
     defaultMode: sanitizeDefaultMode(r.defaultMode),
     envOverrides: sanitizeEnvOverrides(r.envOverrides),
+    contextWindow: isGitHubCopilotContextWindow(r.contextWindow) ? r.contextWindow : undefined,
   };
 }
 

@@ -129,6 +129,10 @@ jest.mock("./ChatModelEnableList", () => ({
   ChatModelEnableList: () => <div data-testid="chat-model-list">chat models</div>,
 }));
 
+jest.mock("./QuickChatGitHubCopilotPanel", () => ({
+  QuickChatGitHubCopilotPanel: () => <div data-testid="quick-chat-github-copilot" />,
+}));
+
 jest.mock("./ConfiguredModelEnableList", () => ({
   ConfiguredModelEnableList: ({ descriptor }: { descriptor: { id: string } }) => (
     <div data-testid={`model-list-${descriptor.id}`}>model list</div>

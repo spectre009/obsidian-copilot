@@ -531,8 +531,11 @@ const ChatInternal: React.FC<ChatProps & { chatInput: ReturnType<typeof useChatI
 
     if (settings.enableRecentConversations) {
       try {
-        const chatModel = chainManager.chatModelManager.getChatModel();
-        plugin.userMemoryManager.addRecentConversation(chatUIState.getMessages(), chatModel);
+        // Summaries run for every new chat, so they use the background model.
+        // https://github.com/spectre009/obsidian-copilot/issues/3
+        plugin.userMemoryManager.addRecentConversation(chatUIState.getMessages(), () =>
+          chainManager.getBackgroundChatModel()
+        );
       } catch (error) {
         logInfo("Failed to analyze chat messages for memory:", error);
       }
@@ -556,7 +559,7 @@ const ChatInternal: React.FC<ChatProps & { chatInput: ReturnType<typeof useChatI
     setIncludeActiveWebTab(true);
   }, [
     handleStopGenerating,
-    chainManager.chatModelManager,
+    chainManager,
     chatUIState,
     settings.autosaveChat,
     settings.autoAttachActiveNote,

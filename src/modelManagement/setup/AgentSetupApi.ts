@@ -38,7 +38,37 @@ export interface AgentSyncResult {
   removed: string[];
 }
 
+export interface BootstrapAgentModelsInput {
+  agentType: AgentType;
+  providerType: ProviderType;
+  displayName: string;
+  models: readonly ModelInfo[];
+}
+
+export interface AgentBootstrapResult {
+  providerId: string;
+  registered: boolean;
+}
+
 const ENROLL_NONE: readonly string[] = Object.freeze([]);
+
+// Fields an agent's own model list can describe better than the catalog; identity and names stay
+// with the agent's discovery so the two sources never fight over them. https://github.com/spectre009/obsidian-copilot/issues/3
+const BOOTSTRAP_METADATA_KEYS = ["modalities", "limits", "reasoning", "reasoningEfforts"] as const;
+
+function metadataPatch(info: ModelInfo): Partial<ModelInfo> {
+  const patch: Partial<ModelInfo> = {};
+  for (const key of BOOTSTRAP_METADATA_KEYS) {
+    if (info[key] !== undefined) (patch as Record<string, unknown>)[key] = info[key];
+  }
+  return patch;
+}
+
+function patchChanges(current: ModelInfo, patch: Partial<ModelInfo>): boolean {
+  return Object.entries(patch).some(
+    ([key, value]) => JSON.stringify(current[key as keyof ModelInfo]) !== JSON.stringify(value)
+  );
+}
 
 export class AgentSetupApi {
   readonly #providers: ProviderRegistry;
@@ -46,6 +76,7 @@ export class AgentSetupApi {
   readonly #backends: BackendConfigRegistry;
   readonly #catalog: CatalogDownloadService;
   readonly #coordinator: ModelManagementCoordinator;
+  readonly #queues = new Map<AgentType, Promise<unknown>>();
 
   constructor(
     providerRegistry: ProviderRegistry,
@@ -62,6 +93,10 @@ export class AgentSetupApi {
   }
 
   async registerAgentProvider(input: RegisterAgentProviderInput): Promise<AgentSetupResult> {
+    return this.#serialized(input.agentType, () => this.#registerAgentProvider(input));
+  }
+
+  async #registerAgentProvider(input: RegisterAgentProviderInput): Promise<AgentSetupResult> {
     const existing = this.#findAgentProvider(input.agentType, input.providerType);
 
     let providerId: string;
@@ -114,6 +149,54 @@ export class AgentSetupApi {
   }
 
   async syncAgentModels(input: SyncAgentModelsInput): Promise<AgentSyncResult> {
+    return this.#serialized(input.agentType, () => this.#syncAgentModels(input));
+  }
+
+  /**
+   * Seeds an agent's provider from a second source of its model list without competing with the
+   * agent's own discovery: it creates the provider and its models only when none exists, and
+   * otherwise refreshes capability metadata of models already listed. Adding and removing models
+   * stays with discovery. Runs in the same per-agent queue as registration and sync, so two
+   * sources starting at once never create two providers.
+   * https://github.com/spectre009/obsidian-copilot/issues/3
+   * @param input the agent, its provider identity, and the models with their capability metadata
+   */
+  async bootstrapAgentModels(input: BootstrapAgentModelsInput): Promise<AgentBootstrapResult> {
+    return this.#serialized(input.agentType, async () => {
+      const existing = this.#findAgentProvider(input.agentType, input.providerType);
+      if (!existing) {
+        const providerId = await this.#providers.add({
+          providerType: input.providerType,
+          displayName: input.displayName,
+          origin: { kind: "agent", agentType: input.agentType },
+          requiresApiKey: false,
+        });
+        for (const info of input.models) {
+          const configuredModelId = await this.#models.add({ providerId, info });
+          await this.#backends.enableModel(input.agentType, configuredModelId);
+        }
+        return { providerId, registered: true };
+      }
+      for (const info of input.models) {
+        const current = this.#models.getByWireId(existing.providerId, info.id);
+        if (!current) continue;
+        const patch = metadataPatch(info);
+        if (patchChanges(current.info, patch)) {
+          await this.#models.update(current.configuredModelId, { info: patch });
+        }
+      }
+      return { providerId: existing.providerId, registered: false };
+    });
+  }
+
+  #serialized<T>(agentType: AgentType, task: () => Promise<T>): Promise<T> {
+    const prior = this.#queues.get(agentType) ?? Promise.resolve();
+    const run = prior.catch(() => undefined).then(task);
+    this.#queues.set(agentType, run);
+    return run;
+  }
+
+  async #syncAgentModels(input: SyncAgentModelsInput): Promise<AgentSyncResult> {
     const providers = this.#listAgentProviders(input.agentType);
     if (providers.length === 0) {
       return { added: [], removed: [] };

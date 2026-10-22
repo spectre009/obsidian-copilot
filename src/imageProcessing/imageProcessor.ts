@@ -207,6 +207,16 @@ export class ImageProcessor {
     }
   }
 
+  /**
+   * Fetches a web image as a data URL, within the same size and type checks as chat images, for
+   * models that accept only inline image data.
+   * https://github.com/spectre009/obsidian-copilot/issues/3
+   * @param imageUrl an http(s) image URL
+   */
+  static async webImageToDataUrl(imageUrl: string): Promise<string | null> {
+    return this.handleWebImage(imageUrl);
+  }
+
   private static async handleLocalImage(imageUrl: string, vault: Vault): Promise<string | null> {
     try {
       const localPath = decodeURIComponent(imageUrl.replace("app://", ""));

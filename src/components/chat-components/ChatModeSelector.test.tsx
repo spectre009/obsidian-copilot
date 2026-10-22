@@ -51,22 +51,42 @@ describe("ChatModeSelector", () => {
       expect(onModeChange).toHaveBeenCalledWith(ChainType.LLM_CHAIN);
     });
 
-    it("https://github.com/spectre009/obsidian-copilot/issues/1 offers only Free Chat, with no Copilot Plus item or upsell, when the Plus mode is hidden", () => {
+    it("https://github.com/spectre009/obsidian-copilot/issues/3 offers chat and vault chat, with no Copilot Plus item or upsell, while vendor services are blocked", () => {
+      const onModeChange = jest.fn();
       const onPlusUpsell = jest.fn();
       render(
         <ChatModeSelector
           selectedChain={ChainType.LLM_CHAIN}
-          isPaidUser
-          plusModeHidden
-          onModeChange={jest.fn()}
+          isPaidUser={false}
+          vaultChat
+          onModeChange={onModeChange}
           onPlusUpsell={onPlusUpsell}
           defaultOpen
         />
       );
 
-      expect(screen.getAllByText("chat (free)")).toHaveLength(2);
+      expect(screen.getAllByText("chat")).toHaveLength(2);
       expect(screen.queryByText("copilot plus")).toBeNull();
-      expect(screen.getAllByRole("menuitem")).toHaveLength(1);
+      expect(screen.getAllByRole("menuitem")).toHaveLength(2);
+
+      fireEvent.click(screen.getByText("vault chat"));
+      expect(onModeChange).toHaveBeenCalledWith(ChainType.COPILOT_PLUS_CHAIN);
+      expect(onPlusUpsell).not.toHaveBeenCalled();
+    });
+
+    it("https://github.com/spectre009/obsidian-copilot/issues/3 labels the selected note-finding mode vault chat while vendor services are blocked", () => {
+      render(
+        <ChatModeSelector
+          selectedChain={ChainType.COPILOT_PLUS_CHAIN}
+          isPaidUser
+          vaultChat
+          onModeChange={jest.fn()}
+          onPlusUpsell={jest.fn()}
+          defaultOpen
+        />
+      );
+
+      expect(screen.getAllByText("vault chat")).toHaveLength(2);
     });
 
     it("keeps the Copilot Plus upsell for free users https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {

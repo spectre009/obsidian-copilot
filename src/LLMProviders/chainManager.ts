@@ -16,6 +16,9 @@ import { App } from "obsidian";
 import ChatModelManager from "./chatModelManager";
 import MemoryManager from "./memoryManager";
 import { UserMemoryManager } from "@/memory/UserMemoryManager";
+import { isEffectivelyAutonomous, modelCanCallTools } from "@/vendorServices/localVaultChat";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { getBackgroundChatModel } from "./backgroundChatModel";
 
 export default class ChainManager {
   public app: App;
@@ -53,6 +56,14 @@ export default class ChainManager {
 
   private async initialize() {
     await this.createChainWithNewModel();
+  }
+
+  /** The model for query expansion, chat titles and conversation summaries. https://github.com/spectre009/obsidian-copilot/issues/3 */
+  async getBackgroundChatModel(): Promise<BaseChatModel> {
+    return getBackgroundChatModel({
+      modelManagement: this.modelManagement,
+      chatModelManager: this.chatModelManager,
+    });
   }
 
   private validateChainType(chainType: ChainType): void {
@@ -116,7 +127,9 @@ export default class ChainManager {
       case ChainType.LLM_CHAIN:
         return new LLMChainRunner(this);
       case ChainType.COPILOT_PLUS_CHAIN:
-        if (settings.enableAutonomousAgent) {
+        if (
+          isEffectivelyAutonomous(settings, modelCanCallTools(this.chatModelManager.getChatModel()))
+        ) {
           return new AutonomousAgentChainRunner(this);
         }
         return new CopilotPlusChainRunner(this);

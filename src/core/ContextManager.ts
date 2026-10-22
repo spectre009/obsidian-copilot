@@ -12,6 +12,7 @@ import {
   PromptLayerSegment,
 } from "@/context/PromptContextTypes";
 import { ContextProcessor } from "@/contextProcessor";
+import { effectiveAutoCompactThreshold } from "@/LLMProviders/githubCopilot/githubCopilotCompaction";
 import { logInfo } from "@/logger";
 import { Mention } from "@/mentions/Mention";
 import { getSettings } from "@/settings/model";
@@ -198,7 +199,7 @@ export class ContextManager {
 
       let finalProcessedMessage = processedUserMessage + contextPortion;
 
-      const charThreshold = getSettings().autoCompactThreshold * 4;
+      const charThreshold = (await effectiveAutoCompactThreshold(getSettings())) * 4;
 
       let wasCompacted = false;
       let compactedContextPortion = contextPortion;

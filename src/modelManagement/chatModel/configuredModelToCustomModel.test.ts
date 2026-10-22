@@ -80,6 +80,19 @@ describe("configuredModelToCustomModel", () => {
       ).toBe(ChatModelProviders.COPILOT_PLUS);
     });
 
+    it("maps GitHub Copilot's agent provider to the GitHub Copilot chat model, whatever type it registered with (https://github.com/spectre009/obsidian-copilot/issues/3)", () => {
+      expect(
+        mapProviderTypeToChatModelProvider(
+          provider({ origin: { kind: "agent", agentType: "github-copilot" } })
+        )
+      ).toBe(ChatModelProviders.GITHUB_COPILOT);
+      expect(
+        mapProviderTypeToChatModelProvider(
+          provider({ origin: { kind: "agent", agentType: "codex" } })
+        )
+      ).toBe(ChatModelProviders.OPENAI_FORMAT);
+    });
+
     it("maps an xAI catalog provider with a custom base URL to OPENAI_FORMAT", () => {
       expect(
         mapProviderTypeToChatModelProvider(

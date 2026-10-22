@@ -14,8 +14,9 @@ import {
   MessageContent,
 } from "@/imageProcessing/imageProcessor";
 import { logInfo, logWarn } from "@/logger";
-import { checkIsPaidUser } from "@/plusUtils";
 import { getSettings } from "@/settings/model";
+import { canRunVaultChat } from "@/vendorServices/localVaultChat";
+import { areVendorServicesBlocked } from "@/vendorServices/vendorServicesPolicy";
 import {
   getEffectiveUserPrompt,
   getSystemPromptWithMemory,
@@ -242,7 +243,12 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
       }
     }
 
-    if (message.includes("@websearch") || message.includes("@web")) {
+    // Web search is a vendor service, so a blocked install never plans it.
+    // https://github.com/spectre009/obsidian-copilot/issues/3
+    if (
+      (message.includes("@websearch") || message.includes("@web")) &&
+      !areVendorServicesBlocked(getSettings())
+    ) {
       const hasWebSearch = toolCalls.some((tc) => tc.tool.name === "webSearch");
       if (!hasWebSearch) {
         const memory = ChainOwner.instance.getCurrentChainManager().memoryManager.getMemory();
@@ -646,7 +652,7 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
     const thinkStreamer = new ThinkBlockStreamer(updateCurrentAiMessage, excludeThinking);
     let sources: { title: string; path: string; score: number; explanation?: unknown }[] = [];
 
-    const isPaidUser = await checkIsPaidUser(this.chainManager.app, {
+    const isPaidUser = await canRunVaultChat(this.chainManager.app, {
       trigger: "legacy_chat_turn",
       isCopilotPlus: true,
     });

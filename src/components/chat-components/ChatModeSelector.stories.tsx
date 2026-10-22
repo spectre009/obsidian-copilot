@@ -29,6 +29,10 @@ export const FreeUserUpsell: StoryObj<ChatModeSelectorProps> = {
   args: { isPaidUser: false },
 };
 
-export const VendorServicesBlocked: StoryObj<ChatModeSelectorProps> = {
-  args: { isPaidUser: false, plusModeHidden: true },
+export const VaultChatMenu: StoryObj<ChatModeSelectorProps> = {
+  args: { isPaidUser: false, vaultChat: true },
+};
+
+export const VaultChatSelected: StoryObj<ChatModeSelectorProps> = {
+  args: { isPaidUser: false, vaultChat: true, selectedChain: "copilot_plus" as ChainType },
 };

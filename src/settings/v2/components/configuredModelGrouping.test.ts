@@ -214,6 +214,24 @@ describe("configuredModelGrouping", () => {
         "m-chat",
       ]);
     });
+
+    it("lists GitHub Copilot's agent-provided models, which run in Quick Chat through the Copilot CLI (https://github.com/spectre009/obsidian-copilot/issues/3)", () => {
+      const copilot: Provider = {
+        ...agentProvider("copilot-agent", "codex", "GitHub Copilot"),
+        origin: { kind: "agent", agentType: "github-copilot" },
+      };
+      const { byokPlusCandidates } = partitionChatCandidates(
+        [
+          model("m-copilot", "copilot-agent", "claude-haiku-4.5"),
+          model("m-agent", "codex-agent", "gpt-5"),
+        ],
+        { ...providers, [copilot.providerId]: copilot },
+        new Set(["m-copilot"])
+      );
+      expect(
+        byokPlusCandidates.map((c) => [c.configuredModel.configuredModelId, c.enabled])
+      ).toEqual([["m-copilot", true]]);
+    });
   });
 
   describe("opencodeOnlySubGroupLabel()", () => {

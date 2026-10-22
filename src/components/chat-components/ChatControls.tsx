@@ -56,7 +56,7 @@ export function ChatControls({
         <ChatModeSelector
           selectedChain={selectedChain}
           isPaidUser={Boolean(isPaidUser)}
-          plusModeHidden={areVendorServicesBlocked(settings)}
+          vaultChat={areVendorServicesBlocked(settings)}
           onModeChange={handleModeChange}
           onPlusUpsell={() => navigateToPlusPage("chat_mode_select")}
         />

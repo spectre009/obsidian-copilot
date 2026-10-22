@@ -9,15 +9,24 @@ import { App, TFile } from "obsidian";
 import { ChunkManager, getSharedChunkManager } from "./chunks";
 import { SearchCore } from "./SearchCore";
 import { ExpandedQuery } from "./QueryExpander";
-let getChatModelManagerSingleton: (() => { getChatModel: () => BaseChatModel }) | null = null;
+let getQueryExpansionModel: (() => Promise<BaseChatModel>) | null = null;
+// Query expansion runs on every searching turn, so it uses the background model.
+// https://github.com/spectre009/obsidian-copilot/issues/3
 async function safeGetChatModel(): Promise<BaseChatModel | null> {
   try {
-    if (!getChatModelManagerSingleton) {
-      const mod = await import("@/LLMProviders/chatModelManager");
-      getChatModelManagerSingleton = () => mod.default.getInstance();
+    if (!getQueryExpansionModel) {
+      const [chainOwner, chatModelManager] = await Promise.all([
+        import("@/LLMProviders/chainOwner"),
+        import("@/LLMProviders/chatModelManager"),
+      ]);
+      getQueryExpansionModel = async () => {
+        const owner = chainOwner.default.instance;
+        return owner
+          ? owner.getCurrentChainManager().getBackgroundChatModel()
+          : chatModelManager.default.getInstance().getChatModel();
+      };
     }
-    const chatModelManager = getChatModelManagerSingleton();
-    return chatModelManager.getChatModel();
+    return await getQueryExpansionModel();
   } catch {
     return null;
   }

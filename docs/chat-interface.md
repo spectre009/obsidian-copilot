@@ -14,9 +14,9 @@ In the phone's right sidebar, the message box sits above the keyboard while typi
 
 ## Choose a model
 
-Use the model picker below the message box. It shows only models enabled under **Settings → Copilot → Basic → Agents → Quick Chat**, including Copilot-hosted and bring-your-own-key models.
+Use the model picker below the message box. It shows only models enabled under **Settings → Copilot → Basic → Agents → Quick Chat**, including Copilot-hosted, bring-your-own-key, and, on desktop, GitHub Copilot models.
 
-The **Default model** in that settings panel controls which model a new Quick Chat starts with. See [Models, Effort, and Permissions](models-and-parameters.md) to manage the list.
+The **Default model** in that settings panel controls which model a new Quick Chat starts with. See [Models, Effort, and Permissions](models-and-parameters.md) to manage the list, and [GitHub Copilot models in Quick Chat](llm-providers.md#github-copilot-models-in-quick-chat) for how those models run and bill.
 
 ## Choose a chat mode
 
@@ -25,7 +25,14 @@ Use the mode picker at the bottom of Quick Chat to choose between two distinct e
 - **Chat (free)** answers from the context you attach. It does not search your vault automatically.
 - **Copilot Plus** can use tools, including local search. When Miyo is enabled, local search is semantic; when Miyo is disabled, it uses keyword search. Copilot Plus requires an eligible license.
 
-Vault QA is no longer a separate mode. If it was your saved mode before upgrading, Quick Chat starts in **Chat (free)**. Choose **Copilot Plus** when you want automatic vault retrieval. See [Vault Search and Indexing](vault-search-and-indexing.md).
+While **Block vendor services** is on, the picker offers **chat** and **vault chat** instead:
+
+- **chat** works like Chat (free).
+- **vault chat** searches your vault for notes relevant to each question and answers with clickable links to the notes it used. Search runs on this computer with keyword search, or with Miyo when it is enabled; no license is needed. Vault search turns on when you enter vault chat; the database button below the message box turns it off and on. Web search and YouTube tools are unavailable.
+
+For models that can call tools, such as most BYOK models, the **Autonomous agent** toggle still lets the model choose its own searches. GitHub Copilot models can't call tools, so they always use vault chat's automatic search, and the toggle is hidden for them.
+
+Vault QA is no longer a separate mode. If it was your saved mode before upgrading, Quick Chat starts in **Chat (free)**. Choose **Copilot Plus** or **vault chat** when you want automatic vault retrieval. See [Vault Search and Indexing](vault-search-and-indexing.md).
 
 ## Ask with context
 

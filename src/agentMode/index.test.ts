@@ -660,6 +660,25 @@ describe("agentMode", () => {
       );
     });
 
+    it("restarts only GitHub Copilot when its context window changes, because the tier is a launch flag (https://github.com/spectre009/obsidian-copilot/issues/3)", () => {
+      createAgentSessionManager({} as App, plugin);
+      const next = {
+        ...mockSettings,
+        agentMode: {
+          ...mockSettings.agentMode,
+          backends: { "github-copilot": { contextWindow: "long_context" } },
+        },
+      } as CopilotSettings;
+
+      emitSettingsChange(mockSettings, next);
+
+      expect(mockManager.noteSpawnConfigChanged).toHaveBeenCalledTimes(1);
+      expect(mockManager.noteSpawnConfigChanged).toHaveBeenCalledWith(
+        "github-copilot",
+        "context window changed"
+      );
+    });
+
     it(`retains only previously ready agents during compatibility checks ${ISSUE}`, async () => {
       createAgentSessionManager({} as App, plugin);
       await mockManager.registerPreload.mock.calls[0][1];

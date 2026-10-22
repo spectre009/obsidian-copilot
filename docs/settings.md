@@ -38,7 +38,7 @@ On desktop, the first selector and five inline tabs control what new Agent Chat 
 | **Notification**                                    | **On**                             | Plays a short sound whenever an agent stops and wants you: the turn finished, the turn hit an error, or a tool is waiting for your approval. It stays quiet while focus is inside that Agent Chat, and repeated alerts within one second play only once. Turn it off when you do not want audible notifications.                           |
 | **Sound**                                           | **Piano key**                      | Chooses which sound plays: **Piano key**, **Marimba**, **Bell**, or **Doorbell**. Selecting one previews it unless another sound played in the last second. Appears only while **Notification** is on.                                                                                                                                     |
 | **GitHub Copilot / opencode / Claude / Codex tabs** | **GitHub Copilot** tab opens first | Configure each installed agent, its default model and effort, its enabled models, and its process environment.                                                                                                                                                                                                                             |
-| **Quick Chat tab**                                  | Not applicable                     | Curates the separate model list used by Quick Chat and Quick Ask. Claude, Codex, and GitHub Copilot account models do not become Quick Chat models.                                                                                                                                                                                        |
+| **Quick Chat tab**                                  | Not applicable                     | Curates the separate model list used by Quick Chat and Quick Ask, the background model, and GitHub Copilot's Quick Chat controls. GitHub Copilot models can run in Quick Chat on desktop; Claude and Codex account models do not become Quick Chat models.                                                                                 |
 
 The model controls shared by installed agents behave as follows:
 
@@ -62,6 +62,8 @@ Select **Configure** to open these controls:
 | **Sign in**                    | Not applicable              | Shows the `copilot login` command to run in a terminal. The sign-in is shared with the CLI in your terminal; start a new chat after signing in.                                                                                                        |
 
 After installation, choose the **Default model**, **Default effort**, and model switches. **Environment variables** passes values such as `HTTPS_PROXY` or `GH_HOST` to the CLI; Copilot ignores rows for `COPILOT_*` (except `COPILOT_GH_HOST` and `COPILOT_PROXY_KERBEROS_SPN`), `GH_TOKEN`, `GITHUB_TOKEN`, and `OTEL_*`, which it sets itself.
+
+**Context window** (default **Default**) starts the CLI with `--context long_context` when set to **Long context**, so models that offer a long-context tier use it, at their long-context price. Changing it restarts GitHub Copilot; while a chat is open, the change applies when you reload.
 
 #### opencode
 
@@ -130,12 +132,24 @@ See [Agent Chat](agent-mode-and-tools.md) for setup, permissions, projects, mult
 
 #### Quick Chat
 
-Quick Chat uses Copilot-hosted or BYOK models, not the model currently selected in Agent Chat.
+Quick Chat uses Copilot-hosted, BYOK, or (on desktop) GitHub Copilot models, not the model currently selected in Agent Chat.
 
-| Control                                   | Default                                                      | What it does                                                                                                          |
-| ----------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| **Default model**                         | **Select Model** until an enabled, usable model is available | Chooses the model for new Quick Chat conversations. A licensed setup may seed a Copilot-hosted default.               |
-| **Search chat models and model switches** | New BYOK chat models are enabled automatically               | Controls what appears in the Quick Chat model picker. Add or remove providers in **BYOK**, then curate the list here. |
+| Control                                   | Default                                                                                            | What it does                                                                                                                                                                                                       |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Default model**                         | **Select Model** until an enabled, usable model is available                                       | Chooses the model for new Quick Chat conversations. A licensed setup may seed a Copilot-hosted default.                                                                                                            |
+| **Search chat models and model switches** | New BYOK chat models are enabled automatically                                                     | Controls what appears in the Quick Chat model picker. Add or remove providers in **BYOK**, then curate the list here. GitHub Copilot models are enabled once when Copilot first finds them.                        |
+| **Background model**                      | **Claude Haiku 4.5** from GitHub Copilot when it is enabled here, otherwise **Same as chat model** | Runs query expansion on each vault search, a title for each new chat, and a summary of each finished chat. A model you later turn off falls back to the chat model. Context compaction always uses the chat model. |
+| **Background thinking level**             | **Low**                                                                                            | Reasoning effort for a GitHub Copilot background model.                                                                                                                                                            |
+
+The **GitHub Copilot** section below them applies to GitHub Copilot models only; BYOK models keep their own effort settings.
+
+| Control            | Default           | What it does                                                                                                                                                                                                                               |
+| ------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Account**        | Not applicable    | Shows the GitHub account requests bill: the CLI's `copilot login` account, or the GitHub CLI's active account when the CLI has none. Run `copilot login` to sign in or switch.                                                             |
+| **Thinking level** | **Model default** | How much the model reasons before answering: **Low**, **Medium**, **High**, **Extra high**, or **Max**. Models that don't accept a level get the nearest one they support; models with a fixed effort ignore it.                           |
+| **Context window** | **Default**       | **Long context** uses a model's long-context tier where it offers one, at its long-context price. The description shows how many prompt tokens the model selected in Quick Chat accepts on each tier. Compaction stays within that budget. |
+
+See [GitHub Copilot models in Quick Chat](llm-providers.md#github-copilot-models-in-quick-chat) for how these models run and what they cost.
 
 Quick Ask uses an enabled Quick Chat model, starting with **Default quick command model** in the **Command** tab. This default is shared with Quick Command and saved commands set to **Default model**. Popup model changes apply only to that run. See [Quick Chat](chat-interface.md) and [Quick Ask](custom-commands.md#quick-ask).
 

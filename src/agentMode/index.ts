@@ -10,6 +10,7 @@ import { copilotAppDataDir, getVaultId } from "@/utils/appPaths";
 import { isObsidianCliEnabled } from "@/services/obsidianCli/ObsidianCliClient";
 import { requireNodeModule } from "@/utils/desktopRuntime";
 import { buildAgentSystemPrompt } from "./backends/shared/agentSystemPrompt";
+import { githubCopilotSpawnArgs } from "./backends/github-copilot/GitHubCopilotBackend";
 import { getBuiltinSkillEnvRestartPolicy } from "./backends/shared/builtinSkillEnv";
 import { vendorServicesTransition } from "@/vendorServices/vendorServicesPolicy";
 import { backendRegistry, listBackendDescriptors } from "./backends/registry";
@@ -313,6 +314,16 @@ export function createAgentSessionManager(app: App, plugin: CopilotPlugin): Agen
         );
     }
   });
+  // The context tier is a launch flag, so changing it needs a new process.
+  // https://github.com/spectre009/obsidian-copilot/issues/3
+  subscribeToSettingsChange((prev, next) => {
+    if (githubCopilotSpawnArgs(prev).join(" ") === githubCopilotSpawnArgs(next).join(" ")) return;
+    void manager
+      .noteSpawnConfigChanged("github-copilot", "context window changed")
+      .catch((error) =>
+        logError("[AgentMode] restart after context window change failed: github-copilot", error)
+      );
+  });
   const seedManagedBuiltins = async (): Promise<RefreshResult> => {
     seededWithCli = isObsidianCliEnabled();
     return skillManager.refresh(true);
@@ -418,3 +429,8 @@ export function createAgentSessionManager(app: App, plugin: CopilotPlugin): Agen
 export { AgentBackendHeader } from "./backends/shared/ui/AgentBackendHeader";
 
 export { useBackendAuthState } from "./session/useBackendAuthState";
+
+export {
+  githubCopilotSdkLaunchKey,
+  prepareGitHubCopilotSdkLaunch,
+} from "./backends/github-copilot/githubCopilotSdkLaunch";

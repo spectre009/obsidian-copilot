@@ -67,7 +67,11 @@ export function partitionChatCandidates(
     if (configuredModel.info.isEmbedding) continue;
     const provider = providers[configuredModel.providerId];
     if (!provider) continue;
-    if (provider.origin.kind === "agent") continue;
+    // Only GitHub Copilot's agent models can run in Quick Chat; other agents' models need their
+    // agent. https://github.com/spectre009/obsidian-copilot/issues/3
+    if (provider.origin.kind === "agent" && provider.origin.agentType !== "github-copilot") {
+      continue;
+    }
     byokPlusCandidates.push({
       configuredModel,
       provider,

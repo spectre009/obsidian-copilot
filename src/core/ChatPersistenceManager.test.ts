@@ -402,7 +402,7 @@ describe("ChatPersistenceManager", () => {
         expect(createdContent()).not.toContain("user-custom-tag");
       });
 
-      it("applies an AI-generated topic from a structured model response to the note frontmatter", async () => {
+      it("applies an AI-generated topic from the background model's structured response to the note frontmatter (https://github.com/spectre009/obsidian-copilot/issues/3)", async () => {
         const invoke = jest.fn().mockResolvedValue({
           content: [
             { type: "text", text: "Forecast Insights" },
@@ -410,7 +410,7 @@ describe("ChatPersistenceManager", () => {
           ],
         });
         const chainManager = {
-          chatModelManager: { getChatModel: jest.fn().mockReturnValue({ invoke }) },
+          getBackgroundChatModel: jest.fn().mockResolvedValue({ invoke }),
         } as unknown as ChainManager;
         persistenceManager = new ChatPersistenceManager(
           mockApp as unknown as App,

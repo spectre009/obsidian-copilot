@@ -24,6 +24,14 @@ import { MissingApiKeyError, MissingPlusLicenseError } from "@/error";
 import { ChatOpenRouter } from "./ChatOpenRouter";
 import { ChatLMStudio } from "./ChatLMStudio";
 import { BrevilabsClient } from "./brevilabsClient";
+import { ChatGitHubCopilot } from "./githubCopilot/ChatGitHubCopilot";
+import {
+  getGitHubCopilotSdkClient,
+  setActiveGitHubCopilotChatModel,
+} from "./githubCopilot/githubCopilotClientRegistry";
+import { ImageProcessor } from "@/imageProcessing/imageProcessor";
+import type { GitHubCopilotThinkingLevel } from "@/settings/githubCopilotQuickChatSettings";
+import { Notice } from "obsidian";
 import { assertVendorServicesAllowed, isVendorUrl } from "@/vendorServices/vendorServicesPolicy";
 import type { SafetySetting } from "@google/generative-ai";
 
@@ -55,6 +63,17 @@ type ChatConstructorType = {
   new (config: Record<string, unknown>): BaseChatModel;
 };
 
+/** Per-instance settings that differ from Quick Chat's, such as the background model's. https://github.com/spectre009/obsidian-copilot/issues/3 */
+export interface ChatModelOverrides {
+  githubCopilotThinkingLevel?: GitHubCopilotThinkingLevel;
+}
+
+// Runners convert vault and attachment images to data URLs first; only web images reach a
+// GitHub Copilot model as URLs. https://github.com/spectre009/obsidian-copilot/issues/3
+async function webImageToDataUrl(url: string): Promise<string | null> {
+  return /^https?:\/\//i.test(url) ? ImageProcessor.webImageToDataUrl(url) : null;
+}
+
 const CHAT_PROVIDER_CONSTRUCTORS = {
   [ChatModelProviders.OPENAI]: ChatOpenAI,
   [ChatModelProviders.ANTHROPIC]: ChatAnthropic,
@@ -70,6 +89,7 @@ const CHAT_PROVIDER_CONSTRUCTORS = {
   [ChatModelProviders.COPILOT_PLUS]: ChatOpenRouter,
   [ChatModelProviders.MISTRAL]: ChatOpenAI,
   [ChatModelProviders.DEEPSEEK]: ChatDeepSeek,
+  [ChatModelProviders.GITHUB_COPILOT]: ChatGitHubCopilot,
 } as const;
 
 type ChatProviderConstructMap = typeof CHAT_PROVIDER_CONSTRUCTORS;
@@ -102,6 +122,7 @@ export default class ChatModelManager {
     [ChatModelProviders.MISTRAL]: () => getSettings().mistralApiKey,
     [ChatModelProviders.DEEPSEEK]: () => getSettings().deepseekApiKey,
     [ChatModelProviders.SILICONFLOW]: () => getSettings().siliconflowApiKey,
+    [ChatModelProviders.GITHUB_COPILOT]: () => "",
   } as const;
 
   private constructor() {
@@ -119,7 +140,10 @@ export default class ChatModelManager {
     return ChatModelManager.instance;
   }
 
-  private async getModelConfig(customModel: CustomModel): Promise<ModelConfig> {
+  private async getModelConfig(
+    customModel: CustomModel,
+    overrides: ChatModelOverrides = {}
+  ): Promise<ModelConfig> {
     const settings = getSettings();
 
     const modelName = customModel.name;
@@ -302,6 +326,16 @@ export default class ChatModelManager {
           fetch: customModel.enableCors ? safeFetchNoThrow : undefined,
         },
       },
+      [ChatModelProviders.GITHUB_COPILOT]: {
+        modelName,
+        displayName: customModel.displayName,
+        getBackend: getGitHubCopilotSdkClient,
+        thinkingLevel:
+          overrides.githubCopilotThinkingLevel ?? settings.githubCopilotQuickChat.thinkingLevel,
+        contextWindow: settings.githubCopilotQuickChat.contextWindow,
+        resolveImageUrl: webImageToDataUrl,
+        notify: (message: string) => new Notice(message),
+      },
     };
 
     const selectedProviderConfig =
@@ -376,6 +410,11 @@ export default class ChatModelManager {
     ) {
       return true;
     }
+    // GitHub Copilot models sign in through the installed CLI, never with a plugin-held key.
+    // https://github.com/spectre009/obsidian-copilot/issues/3
+    if ((model.provider as ChatModelProviders) === ChatModelProviders.GITHUB_COPILOT) {
+      return true;
+    }
 
     const getDefaultApiKey = this.providerApiKeyMap[model.provider as ChatModelProviders];
     if (!getDefaultApiKey) {
@@ -411,13 +450,21 @@ export default class ChatModelManager {
     try {
       ChatModelManager.chatModel = await this.createModelInstanceFromBridged(model);
       ChatModelManager.activeModel = model;
+      setActiveGitHubCopilotChatModel(
+        (model.provider as ChatModelProviders) === ChatModelProviders.GITHUB_COPILOT
+          ? model.name
+          : null
+      );
     } catch (error) {
       logError(error);
       throw error;
     }
   }
 
-  async createModelInstanceFromBridged(model: CustomModel): Promise<BaseChatModel> {
+  async createModelInstanceFromBridged(
+    model: CustomModel,
+    overrides: ChatModelOverrides = {}
+  ): Promise<BaseChatModel> {
     if (
       (model.provider as ChatModelProviders) === ChatModelProviders.COPILOT_PLUS ||
       (model.baseUrl && isVendorUrl(model.baseUrl))
@@ -436,16 +483,18 @@ export default class ChatModelManager {
     return this.instantiateChatModel(
       model,
       model.provider as ChatModelProviders,
-      this.getProviderConstructor(model)
+      this.getProviderConstructor(model),
+      overrides
     );
   }
 
   private async instantiateChatModel(
     model: CustomModel,
     vendor: ChatModelProviders,
-    AIConstructor: ChatConstructorType
+    AIConstructor: ChatConstructorType,
+    overrides: ChatModelOverrides = {}
   ): Promise<BaseChatModel> {
-    const modelConfig = await this.getModelConfig(model);
+    const modelConfig = await this.getModelConfig(model, overrides);
     const modelInfo = getModelInfo(model.name);
 
     const constructorConfig: Record<string, unknown> = { ...modelConfig };

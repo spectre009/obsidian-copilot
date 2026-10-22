@@ -487,4 +487,89 @@ describe("AgentSetupApi", () => {
       expect(h.enabledFor("opencode").sort()).toEqual([sonnetId, proId].sort());
     });
   });
+
+  describe("bootstrapAgentModels()", () => {
+    const ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/3";
+    const HAIKU = {
+      id: "claude-haiku-4.5",
+      displayName: "Claude Haiku 4.5",
+      modalities: { input: ["text", "image"], output: ["text"] },
+      limits: { context: 144000, input: 128000 },
+      reasoning: true,
+    };
+    const SONNET = {
+      id: "claude-sonnet-5.5",
+      displayName: "Claude Sonnet 5.5",
+      limits: { context: 200000 },
+      reasoning: true,
+      reasoningEfforts: ["low", "medium", "high"],
+    };
+
+    function bootstrap(h: Harness, models = [HAIKU, SONNET]) {
+      return h.api.bootstrapAgentModels({
+        agentType: "github-copilot",
+        providerType: "openai-compatible",
+        displayName: "GitHub Copilot",
+        models,
+      });
+    }
+
+    it(`creates the agent's provider with every model enrolled in that agent when none exists, for ${ISSUE}`, async () => {
+      const h = makeHarness([]);
+
+      const result = await bootstrap(h);
+
+      expect(result.registered).toBe(true);
+      expect(h.providers.get(result.providerId)?.origin).toEqual({
+        kind: "agent",
+        agentType: "github-copilot",
+      });
+      expect(h.models.listByProvider(result.providerId).map((m) => m.info)).toEqual([
+        HAIKU,
+        SONNET,
+      ]);
+      expect(h.enabledFor("github-copilot")).toHaveLength(2);
+      expect(h.enabledFor("chat")).toEqual([]);
+    });
+
+    it(`only refreshes capability metadata of listed models when the provider exists, leaving names and membership to discovery, for ${ISSUE}`, async () => {
+      const h = makeHarness([]);
+      const registered = await h.api.registerAgentProvider({
+        agentType: "github-copilot",
+        providerType: "openai-compatible",
+        displayName: "GitHub Copilot",
+        apiKey: null,
+        wireModelIds: ["claude-haiku-4.5", "gpt-6.1-sol"],
+        fallbackDisplayNames: { "claude-haiku-4.5": "Haiku (agent name)" },
+      });
+
+      const result = await bootstrap(h);
+
+      expect(result).toEqual({ providerId: registered.providerId, registered: false });
+      const models = h.models.listByProvider(registered.providerId);
+      expect(models.map((m) => m.info.id)).toEqual(["claude-haiku-4.5", "gpt-6.1-sol"]);
+      expect(models[0].info).toEqual({
+        ...HAIKU,
+        displayName: "Haiku (agent name)",
+      });
+    });
+
+    it(`serializes with registration so two sources starting at once create one provider, for ${ISSUE}`, async () => {
+      const h = makeHarness([]);
+
+      await Promise.all([
+        bootstrap(h),
+        h.api.registerAgentProvider({
+          agentType: "github-copilot",
+          providerType: "openai-compatible",
+          displayName: "GitHub Copilot",
+          apiKey: null,
+          wireModelIds: ["claude-haiku-4.5"],
+        }),
+      ]);
+
+      expect(h.providers.list()).toHaveLength(1);
+      expect(h.models.list().map((m) => m.info.id)).toEqual(["claude-haiku-4.5"]);
+    });
+  });
 });

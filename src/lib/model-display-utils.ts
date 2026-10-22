@@ -25,6 +25,7 @@ const PROVIDERS_WITHOUT_API_KEYS: ReadonlySet<Provider> = new Set([
   ChatModelProviders.OLLAMA,
   ChatModelProviders.LM_STUDIO,
   ChatModelProviders.COPILOT_PLUS,
+  ChatModelProviders.GITHUB_COPILOT,
 ]);
 
 export function getProviderLabel(provider: string, model?: CustomModel): string {

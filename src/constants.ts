@@ -1,6 +1,10 @@
 import { CustomModel } from "@/aiParams";
 import { DEFAULT_BUILTIN_PREFERENCES } from "@/builtinSkills/builtinSkills";
 import { type CopilotSettings } from "@/settings/model";
+import {
+  DEFAULT_BACKGROUND_MODEL_KEY,
+  DEFAULT_GITHUB_COPILOT_QUICK_CHAT,
+} from "@/settings/githubCopilotQuickChatSettings";
 import { v4 as uuidv4 } from "uuid";
 import { ChainType } from "./chainType";
 import { PromptSortStrategy } from "./types";
@@ -234,6 +238,7 @@ export enum ChatModelProviders {
   DEEPSEEK = "deepseek",
   COHEREAI = "cohereai",
   SILICONFLOW = "siliconflow",
+  GITHUB_COPILOT = "github-copilot",
 }
 
 export enum ModelCapability {
@@ -436,7 +441,10 @@ export type Provider = ChatModelProviders;
 
 export type SettingKeyProviders = Exclude<
   ChatModelProviders,
-  ChatModelProviders.OPENAI_FORMAT | ChatModelProviders.LM_STUDIO | ChatModelProviders.OLLAMA
+  | ChatModelProviders.OPENAI_FORMAT
+  | ChatModelProviders.LM_STUDIO
+  | ChatModelProviders.OLLAMA
+  | ChatModelProviders.GITHUB_COPILOT
 >;
 
 export interface ProviderMetadata {
@@ -540,6 +548,14 @@ export const ProviderInfo: Record<Provider, ProviderMetadata> = {
     label: "Copilot",
     host: BREVILABS_MODELS_BASE_URL,
     curlBaseURL: BREVILABS_MODELS_BASE_URL,
+    keyManagementURL: "",
+  },
+  // Requests go through the installed GitHub Copilot CLI and its sign-in, so there is no host or
+  // key for the plugin to manage. https://github.com/spectre009/obsidian-copilot/issues/3
+  [ChatModelProviders.GITHUB_COPILOT]: {
+    label: "GitHub Copilot",
+    host: "",
+    curlBaseURL: "",
     keyManagementURL: "",
   },
 };
@@ -757,6 +773,8 @@ export const DEFAULT_SETTINGS: CopilotSettings = {
   enableSavedMemory: true,
   quickCommandModelKey: undefined,
   quickCommandIncludeNoteContext: true,
+  backgroundModelKey: DEFAULT_BACKGROUND_MODEL_KEY,
+  githubCopilotQuickChat: DEFAULT_GITHUB_COPILOT_QUICK_CHAT,
   autoAcceptEdits: false,
   diffViewMode: "split",
   userSystemPromptsFolder: DEFAULT_SYSTEM_PROMPTS_FOLDER,

@@ -45,8 +45,28 @@ jest.mock("./ChatOpenRouter", () => {
   }
   return { ChatOpenRouter };
 });
+jest.mock("./githubCopilot/ChatGitHubCopilot", () => {
+  class ChatGitHubCopilot {
+    static configs: Array<Record<string, unknown>> = [];
+    constructor(config: Record<string, unknown>) {
+      ChatGitHubCopilot.configs.push(config);
+    }
+  }
+  return { ChatGitHubCopilot };
+});
 
 import { BrevilabsClient } from "./brevilabsClient";
+import { getActiveGitHubCopilotChatModel } from "./githubCopilot/githubCopilotClientRegistry";
+
+const COPILOT_ISSUE = "https://github.com/spectre009/obsidian-copilot/issues/3";
+
+function copilotConfigs(): Array<Record<string, unknown>> {
+  return (
+    jest.requireMock("./githubCopilot/ChatGitHubCopilot").ChatGitHubCopilot as {
+      configs: Array<Record<string, unknown>>;
+    }
+  ).configs;
+}
 
 function bridgedModel(overrides: Partial<CustomModel> = {}): CustomModel {
   return {
@@ -128,6 +148,44 @@ describe("chatModelManager", () => {
         await expect(
           ChatModelManager.getInstance().createModelInstanceFromBridged(bridgedModel())
         ).rejects.toBeInstanceOf(MissingApiKeyError);
+      });
+
+      it(`builds a GitHub Copilot model without an API key, with Quick Chat's thinking level and context window, for ${COPILOT_ISSUE}`, async () => {
+        setSettings((cur) => ({
+          githubCopilotQuickChat: {
+            ...cur.githubCopilotQuickChat,
+            thinkingLevel: "high",
+            contextWindow: "long_context",
+          },
+        }));
+
+        await ChatModelManager.getInstance().createModelInstanceFromBridged(
+          bridgedModel({
+            name: "claude-sonnet-5.5",
+            displayName: "Claude Sonnet 5.5",
+            provider: ChatModelProviders.GITHUB_COPILOT,
+            requiresApiKey: false,
+          })
+        );
+
+        const config = copilotConfigs().at(-1) ?? {};
+        expect(config).toMatchObject({
+          modelName: "claude-sonnet-5.5",
+          displayName: "Claude Sonnet 5.5",
+          thinkingLevel: "high",
+          contextWindow: "long_context",
+        });
+        expect(typeof config.getBackend).toBe("function");
+        expect(typeof config.resolveImageUrl).toBe("function");
+      });
+
+      it(`builds a GitHub Copilot model with an overriding thinking level, as the background model does, for ${COPILOT_ISSUE}`, async () => {
+        await ChatModelManager.getInstance().createModelInstanceFromBridged(
+          bridgedModel({ name: "claude-haiku-4.5", provider: ChatModelProviders.GITHUB_COPILOT }),
+          { githubCopilotThinkingLevel: "low" }
+        );
+
+        expect(copilotConfigs().at(-1)?.thinkingLevel).toBe("low");
       });
 
       it("sends the plugin version with Copilot Plus chat requests", async () => {
@@ -421,6 +479,18 @@ describe("chatModelManager", () => {
         await manager.setChatModelFromBridged(model);
 
         expect(manager.getActiveModel()).toBe(model);
+      });
+
+      it(`records the active GitHub Copilot model for compaction, and clears it for other providers, for ${COPILOT_ISSUE}`, async () => {
+        const manager = ChatModelManager.getInstance();
+
+        await manager.setChatModelFromBridged(
+          bridgedModel({ name: "claude-haiku-4.5", provider: ChatModelProviders.GITHUB_COPILOT })
+        );
+        expect(getActiveGitHubCopilotChatModel()).toBe("claude-haiku-4.5");
+
+        await manager.setChatModelFromBridged(bridgedModel({ apiKey: "bridge-key" }));
+        expect(getActiveGitHubCopilotChatModel()).toBeNull();
       });
     });
   });
