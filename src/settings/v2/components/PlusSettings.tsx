@@ -50,7 +50,7 @@ export function PlusSettings() {
     <section className={sectionClassName}>
       {vendorServicesSetting}
       <div className="tw-flex tw-items-center tw-justify-between tw-gap-2 tw-text-lg tw-font-semibold">
-        <span>Copilot License</span>
+        <span>Copilot license</span>
         {licenseStatus === "active" && (
           <Badge className="tw-rounded-full tw-bg-success tw-capitalize tw-text-success">
             {license.plan === LIFETIME_PLAN ? "Lifetime" : (license.plan ?? "Active")}
@@ -72,8 +72,8 @@ export function PlusSettings() {
           </a>{" "}
           add <strong className="tw-font-semibold tw-text-normal">premium chat models</strong>,{" "}
           <strong className="tw-font-semibold tw-text-normal">advanced web search</strong>, and{" "}
-          <strong className="tw-font-semibold tw-text-normal">multi-agent capabilities</strong> to
-          your Copilot agentic experience. Pair it with{" "}
+          <strong className="tw-font-semibold tw-text-normal">multi-agent answers</strong> to your
+          Copilot agentic experience. Pair it with{" "}
           <a
             href={createProductUrl(PRODUCT_URLS.MIYO, "license_settings")}
             target="_blank"

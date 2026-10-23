@@ -157,8 +157,8 @@ export async function ensureMultiAgentEntitlement(app?: App): Promise<boolean> {
 
 export function multiAgentRefusalMessage(): string {
   return areVendorServicesBlocked(getSettings())
-    ? `Multi-agent QA needs Copilot Plus. ${VENDOR_SERVICES_BLOCKED_MESSAGE}`
-    : "Multi-agent QA is a Copilot Plus feature. Upgrade to mention more than one agent in a turn.";
+    ? `Multi-agent answers need Copilot Plus. ${VENDOR_SERVICES_BLOCKED_MESSAGE}`
+    : "Multi-agent answers are a Copilot Plus feature. Upgrade to mention more than one agent in a message.";
 }
 
 export function showMultiAgentUpgradePrompt(): void {
@@ -167,7 +167,7 @@ export function showMultiAgentUpgradePrompt(): void {
     return;
   }
   new Notice(
-    "Multi-agent QA (@-mentioning more than one agent in a turn) is a Copilot Plus feature. Opening the upgrade page…",
+    "Multi-agent answers (@-mentioning more than one agent in a message) are a Copilot Plus feature. Opening the upgrade page…",
     8000
   );
   navigateToPlusPage("multi_agent");

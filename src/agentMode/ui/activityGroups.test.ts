@@ -66,6 +66,19 @@ describe("activityGroups", () => {
       expect(types(grouped)).toEqual(["activityGroup", "action", "activityGroup"]);
     });
 
+    it("keeps a call the caller marks standalone out of the group, such as a task's launching call (https://github.com/Brevilabs/obsidian-copilot-private/issues/749)", () => {
+      const grouped = foldActivityGroups(
+        [
+          action("a", { vendorToolName: "Read" }),
+          action("b", { vendorToolName: "Read" }),
+          action("launch", { vendorToolName: "Bash" }),
+          action("c", { vendorToolName: "Bash" }),
+        ],
+        (part) => part.id === "launch"
+      );
+      expect(types(grouped)).toEqual(["activityGroup", "action", "action"]);
+    });
+
     it("never folds a compaction row into a group and splits the groups around it", () => {
       const compaction: RenderNode = {
         type: "compaction",
@@ -376,6 +389,19 @@ describe("activityGroups", () => {
         member("b", { toolKind: "edit", status: "failed" }),
       ]);
       expect(line).toBe("Ran 2 commands, read 1 file");
+    });
+
+    it("does not count a stopped edit as an edited file or as a failure (https://github.com/Brevilabs/obsidian-copilot-private/issues/747)", () => {
+      const { line, failed } = summarizeActivity([
+        member("a", {
+          vendorToolName: "Edit",
+          status: "cancelled",
+          input: { file_path: "plan.md" },
+        }),
+        member("b", { vendorToolName: "Bash", status: "cancelled" }),
+      ]);
+      expect(line).toBe("Ran 2 commands");
+      expect(failed).toBe(0);
     });
 
     it("reports no failures for a clean group", () => {

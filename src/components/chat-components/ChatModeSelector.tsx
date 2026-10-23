@@ -22,7 +22,7 @@ function PlusModeLabel({ vaultChat }: { vaultChat: boolean }) {
   return (
     <div className="tw-flex tw-items-center tw-gap-1">
       {vaultChat ? <Database className="tw-size-4" /> : <Sparkles className="tw-size-4" />}
-      {vaultChat ? "vault chat" : "copilot plus"}
+      {vaultChat ? "Vault chat" : "Copilot Plus"}
     </div>
   );
 }
@@ -35,7 +35,7 @@ export function ChatModeSelector({
   onPlusUpsell,
   defaultOpen,
 }: ChatModeSelectorProps) {
-  const chatLabel = vaultChat ? "chat" : "chat (free)";
+  const chatLabel = vaultChat ? "Chat" : "Chat (free)";
   return (
     <DropdownMenu defaultOpen={defaultOpen}>
       <DropdownMenuTrigger asChild>
@@ -58,7 +58,7 @@ export function ChatModeSelector({
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem onSelect={onPlusUpsell}>
-            copilot plus
+            Copilot Plus
             <SquareArrowOutUpRight className="tw-size-3" />
           </DropdownMenuItem>
         )}

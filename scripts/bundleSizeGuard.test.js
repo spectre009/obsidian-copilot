@@ -191,7 +191,7 @@ describe("bundleSizeGuard", () => {
   });
 
   describe("assertBundleSize()", () => {
-    it("uses the 5.5 MB ceiling for https://github.com/spectre009/obsidian-copilot/issues/3", () => {
+    it("uses the 5.5 MB ceiling for https://github.com/Brevilabs/obsidian-copilot-private/issues/94", () => {
       expect(assertBundleSize("a".repeat(5_499_999))).toBe(5_499_999);
       expect(() => assertBundleSize("a".repeat(5_500_000))).toThrow("strictly below 5500000 bytes");
     });

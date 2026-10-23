@@ -4,8 +4,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 const ts = require("typescript");
 
-// The fork bundles the GitHub Copilot SDK for Quick Chat, so it uses upstream's earlier 5.5 MB
-// ceiling. https://github.com/spectre009/obsidian-copilot/issues/3
 const MAX_BUNDLE_BYTES = 5_500_000;
 const LEGAL_BLOCK_LABEL = "/*! Bundled license information:";
 const LEGAL_BLOCK_PREFIX = `${LEGAL_BLOCK_LABEL}\n\n`;

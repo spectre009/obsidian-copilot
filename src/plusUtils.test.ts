@@ -228,7 +228,7 @@ describe("plusUtils", () => {
   describe("multiAgentRefusalMessage()", () => {
     it("invites an upgrade while vendor services are allowed", () => {
       expect(multiAgentRefusalMessage()).toBe(
-        "Multi-agent QA is a Copilot Plus feature. Upgrade to mention more than one agent in a turn."
+        "Multi-agent answers are a Copilot Plus feature. Upgrade to mention more than one agent in a message."
       );
     });
 

@@ -13,7 +13,7 @@ const CATALOG: ModelInfo[] = [{ value: "claude-x", displayName: "Claude X", desc
 function fakeProbe(models: ModelInfo[]) {
   return {
     initializationResult: jest.fn().mockResolvedValue({ models }),
-    interrupt: jest.fn().mockResolvedValue(undefined),
+    close: jest.fn(),
   };
 }
 
@@ -52,6 +52,23 @@ describe("effortOption", () => {
         .options;
       expect(opts.env?.A).toBe("1");
       for (const key of Object.values(PLUS_ENV)) expect(opts.env).not.toHaveProperty(key);
+    });
+
+    it("closes its probe query once the catalog is read, so no Claude process outlives the probe", async () => {
+      const probe = fakeProbe(CATALOG);
+      queryMock.mockReturnValue(probe);
+      await probeClaudeSdkCatalog("/bin/claude", undefined);
+      expect(probe.close).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes its probe query and returns no models when Claude fails to start", async () => {
+      const probe = {
+        initializationResult: jest.fn().mockRejectedValue(new Error("spawn failed")),
+        close: jest.fn(),
+      };
+      queryMock.mockReturnValue(probe);
+      await expect(probeClaudeSdkCatalog("/bin/claude", undefined)).resolves.toEqual([]);
+      expect(probe.close).toHaveBeenCalledTimes(1);
     });
   });
 

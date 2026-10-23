@@ -27,11 +27,11 @@ describe("ChatModeSelector", () => {
         />
       );
 
-      expect(screen.getAllByText("chat (free)")).toHaveLength(2);
-      expect(screen.getByText("copilot plus")).toBeTruthy();
+      expect(screen.getAllByText("Chat (free)")).toHaveLength(2);
+      expect(screen.getByText("Copilot Plus")).toBeTruthy();
       expect(screen.queryByText(/vault QA/i)).toBeNull();
 
-      fireEvent.click(screen.getByText("copilot plus"));
+      fireEvent.click(screen.getByText("Copilot Plus"));
       expect(onModeChange).toHaveBeenCalledWith(ChainType.COPILOT_PLUS_CHAIN);
     });
 
@@ -47,7 +47,7 @@ describe("ChatModeSelector", () => {
         />
       );
 
-      fireEvent.click(screen.getByText("chat (free)"));
+      fireEvent.click(screen.getByText("Chat (free)"));
       expect(onModeChange).toHaveBeenCalledWith(ChainType.LLM_CHAIN);
     });
 
@@ -65,11 +65,11 @@ describe("ChatModeSelector", () => {
         />
       );
 
-      expect(screen.getAllByText("chat")).toHaveLength(2);
-      expect(screen.queryByText("copilot plus")).toBeNull();
+      expect(screen.getAllByText("Chat")).toHaveLength(2);
+      expect(screen.queryByText("Copilot Plus")).toBeNull();
       expect(screen.getAllByRole("menuitem")).toHaveLength(2);
 
-      fireEvent.click(screen.getByText("vault chat"));
+      fireEvent.click(screen.getByText("Vault chat"));
       expect(onModeChange).toHaveBeenCalledWith(ChainType.COPILOT_PLUS_CHAIN);
       expect(onPlusUpsell).not.toHaveBeenCalled();
     });
@@ -86,7 +86,7 @@ describe("ChatModeSelector", () => {
         />
       );
 
-      expect(screen.getAllByText("vault chat")).toHaveLength(2);
+      expect(screen.getAllByText("Vault chat")).toHaveLength(2);
     });
 
     it("keeps the Copilot Plus upsell for free users https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
@@ -101,7 +101,7 @@ describe("ChatModeSelector", () => {
         />
       );
 
-      fireEvent.click(screen.getByText("copilot plus"));
+      fireEvent.click(screen.getByText("Copilot Plus"));
       expect(onPlusUpsell).toHaveBeenCalledTimes(1);
     });
   });
